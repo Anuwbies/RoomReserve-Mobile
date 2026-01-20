@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:stylish_bottom_bar/stylish_bottom_bar.dart';
 
+import 'Profile_Page.dart';
+
 class NavigationBarPage extends StatefulWidget {
   const NavigationBarPage({super.key});
 
@@ -16,7 +18,7 @@ class _NavigationBarPageState extends State<NavigationBarPage> {
     Center(child: Text('Home')),
     Center(child: Text('Booked')),
     Center(child: Text('Rooms')),
-    Center(child: Text('Profile')),
+    ProfilePage(),
   ];
 
   @override
