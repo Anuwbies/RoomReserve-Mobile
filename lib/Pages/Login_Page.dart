@@ -32,7 +32,7 @@ class _LoginPageState extends State<LoginPage> {
     final password = _passwordController.text;
 
     if (email.isEmpty || password.isEmpty) {
-      _showError('Email and password are required');
+      _showError('All fields are required');
       return;
     }
 
@@ -46,12 +46,14 @@ class _LoginPageState extends State<LoginPage> {
 
       if (!mounted) return;
 
-      Navigator.pushReplacement(
+      Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(
           builder: (_) => const NavigationBarPage(),
         ),
+            (route) => false,
       );
+
     } on FirebaseAuthException catch (e) {
       _showError(e.message ?? 'Login failed');
       if (mounted) setState(() => _loadingMethod = LoginMethod.none);
@@ -89,12 +91,14 @@ class _LoginPageState extends State<LoginPage> {
 
       if (!mounted) return;
 
-      Navigator.pushReplacement(
+      Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(
           builder: (_) => const NavigationBarPage(),
         ),
+            (route) => false,
       );
+
     } catch (_) {
       _showError('Google sign-in failed. Please try again.');
       if (mounted) setState(() => _loadingMethod = LoginMethod.none);
@@ -102,8 +106,16 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+    final messenger = ScaffoldMessenger.of(context);
+
+    messenger.clearSnackBars();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+          textAlign: TextAlign.center,
+        ),
+      ),
     );
   }
 
@@ -304,6 +316,7 @@ class _LoginPageState extends State<LoginPage> {
                                   fontSize: 16,
                                 ),
                               ),
+                              const SizedBox(width: 4)
                             ],
                           ),
                         ),

@@ -233,7 +233,7 @@ class _ProfileItem extends StatelessWidget {
                 ),
                 const Icon(
                   Icons.chevron_right,
-                  color: Colors.grey,
+                  color: Colors.black,
                 ),
               ],
             ),

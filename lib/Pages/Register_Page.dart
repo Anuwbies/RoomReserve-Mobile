@@ -59,13 +59,9 @@ class _RegisterPageState extends State<RegisterPage> {
     final password = _passwordController.text;
     final confirmPassword = _confirmPasswordController.text;
 
-    if (firstName.isEmpty || lastName.isEmpty) {
-      _showError('Please enter your first and last name');
-      return;
-    }
-
-    if (email.isEmpty || password.isEmpty) {
-      _showError('Email and password are required');
+    if ([firstName, lastName, email, password]
+        .any((value) => value.isEmpty)) {
+      _showError('All fields are required');
       return;
     }
 
@@ -136,12 +132,14 @@ class _RegisterPageState extends State<RegisterPage> {
 
       if (!mounted) return;
 
-      Navigator.pushReplacement(
+      Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(
           builder: (_) => const NavigationBarPage(),
         ),
+            (route) => false,
       );
+
     } catch (_) {
       _showError('Google sign-in failed. Please try again.');
       if (mounted) setState(() => _loadingMethod = RegisterMethod.none);
@@ -149,8 +147,16 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+    final messenger = ScaffoldMessenger.of(context);
+
+    messenger.clearSnackBars();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+          textAlign: TextAlign.center,
+        ),
+      ),
     );
   }
 
@@ -328,6 +334,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                   fontSize: 16,
                                 ),
                               ),
+                              const SizedBox(width: 4)
                             ],
                           ),
                         ),
