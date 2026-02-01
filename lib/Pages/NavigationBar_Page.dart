@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:stylish_bottom_bar/stylish_bottom_bar.dart';
 
+import 'Booked_Page.dart';
+import 'Home_Page.dart';
 import 'Profile_Page.dart';
 import 'Rooms_Page.dart';
 
@@ -16,8 +18,8 @@ class _NavigationBarPageState extends State<NavigationBarPage> {
   int _selectedIndex = 0;
 
   final List<Widget> _pages = const [
-    Center(child: Text('Home')),
-    Center(child: Text('Booked')),
+    HomePage(),
+    BookedPage(),
     RoomsPage(),
     ProfilePage(),
   ];

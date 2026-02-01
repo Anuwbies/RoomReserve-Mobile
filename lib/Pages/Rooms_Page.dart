@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class RoomsPage extends StatefulWidget {
   const RoomsPage({super.key});
@@ -18,9 +19,24 @@ class _RoomsPageState extends State<RoomsPage> {
   String? _selectedFloor;
 
   @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final filteredRooms = _filterRooms(sampleRooms, _query);
-    final groupedRooms = _groupRoomsByType(filteredRooms);
+    // Firestore Query
+    // Using strict path: /artifacts/{appId}/public/data/{collectionName}
+    const String appId = 'default-app-id';
+    final Stream<QuerySnapshot> roomsStream = FirebaseFirestore.instance
+        .collection('artifacts')
+        .doc(appId)
+        .collection('public')
+        .doc('data')
+        .collection('rooms')
+        .orderBy('createdAt', descending: true) // Optional: Show newest first
+        .snapshots();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
@@ -43,7 +59,6 @@ class _RoomsPageState extends State<RoomsPage> {
                       decoration: InputDecoration(
                         hintText: 'Search...',
                         prefixIcon: const Icon(Icons.search),
-                        // Makes icon and text closer
                         prefixIconConstraints: const BoxConstraints(
                           minWidth: 40,
                           minHeight: 40,
@@ -80,7 +95,7 @@ class _RoomsPageState extends State<RoomsPage> {
               ),
             ),
 
-            /* ACTIVE FILTER INDICATOR (Optional visual cue) */
+            /* ACTIVE FILTER INDICATOR */
             if (_hasActiveFilters())
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -106,18 +121,53 @@ class _RoomsPageState extends State<RoomsPage> {
                 ),
               ),
 
-            /* ROOM LIST */
+            /* ROOM LIST STREAM */
             Expanded(
-              child: groupedRooms.isEmpty
-                  ? const Center(child: Text("No rooms found"))
-                  : ListView.builder(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                itemCount: groupedRooms.length,
-                itemBuilder: (context, index) {
-                  final entry = groupedRooms.entries.elementAt(index);
-                  return RoomTypeCard(
-                    type: entry.key,
-                    rooms: entry.value,
+              child: StreamBuilder<QuerySnapshot>(
+                stream: roomsStream,
+                builder: (context, snapshot) {
+                  if (snapshot.hasError) {
+                    return Center(child: Text('Error: ${snapshot.error}'));
+                  }
+
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  // 1. Convert Firestore Docs to Room Objects
+                  final allRooms = snapshot.data!.docs.map((doc) {
+                    return Room.fromFirestore(doc);
+                  }).toList();
+
+                  // 2. Apply Client-Side Filtering
+                  final filteredRooms = _filterRooms(allRooms, _query);
+
+                  if (filteredRooms.isEmpty) {
+                    return const Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.search_off, size: 48, color: Colors.grey),
+                          SizedBox(height: 16),
+                          Text("No rooms found", style: TextStyle(color: Colors.grey)),
+                        ],
+                      ),
+                    );
+                  }
+
+                  // 3. Group by Type
+                  final groupedRooms = _groupRoomsByType(filteredRooms);
+
+                  return ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    itemCount: groupedRooms.length,
+                    itemBuilder: (context, index) {
+                      final entry = groupedRooms.entries.elementAt(index);
+                      return RoomTypeCard(
+                        type: entry.key,
+                        rooms: entry.value,
+                      );
+                    },
                   );
                 },
               ),
@@ -188,10 +238,14 @@ class _RoomsPageState extends State<RoomsPage> {
   /* ===================== UI HELPERS ===================== */
 
   void _showFilterSheet() {
-    // Extract unique values for dropdowns
-    final types = sampleRooms.map((e) => e.type).toSet().toList();
-    final buildings = sampleRooms.map((e) => e.building).toSet().toList();
-    final floors = sampleRooms.map((e) => e.floor).toSet().toList();
+    // Note: In a real app with Firestore, getting unique values for filters
+    // might require a separate aggregation query or iterating the current list.
+    // For simplicity, we'll keep hardcoded lists or you can derive them from 'allRooms'
+    // if you pass them into this method. Here I'll use standard lists.
+
+    final types = ['Classroom', 'Laboratory', 'Meeting Room', 'Auditorium', 'Office'];
+    final buildings = ['PTC Building', 'ITS Building', 'Main Building', 'Engineering', 'Science Wing'];
+    final floors = ['Ground Floor', '1st Floor', '2nd Floor', '3rd Floor', '4th Floor'];
 
     showModalBottomSheet(
       context: context,
@@ -474,29 +528,32 @@ class _RoomRow extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 6),
-                Wrap(
-                  spacing: 6,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: availabilityColor),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        availabilityLabel,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                          color: availabilityColor,
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      Container(
+                        margin: const EdgeInsets.only(right: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: availabilityColor),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          availabilityLabel,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: availabilityColor,
+                          ),
                         ),
                       ),
-                    ),
-                    if (room.tags.isNotEmpty)
-                      Container(
+                      // Display first few tags
+                      ...room.tags.take(3).map((tag) => Container(
+                        margin: const EdgeInsets.only(right: 6),
                         padding: const EdgeInsets.symmetric(
                           horizontal: 8,
                           vertical: 4,
@@ -509,37 +566,38 @@ class _RoomRow extends StatelessWidget {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              room.tags.first.icon,
+                              tag.icon,
                               size: 14,
                               color: Colors.grey.shade700,
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              room.tags.first.label,
+                              tag.label,
                               style: const TextStyle(fontSize: 11),
                             ),
                           ],
                         ),
-                      ),
-                    if (room.tags.length > 1)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: borderColor),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          '+${room.tags.length - 1}',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
+                      )),
+                      if (room.tags.length > 3)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: borderColor),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            '+${room.tags.length - 3}',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                         ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -553,6 +611,7 @@ class _RoomRow extends StatelessWidget {
 /* ===================== DATA MODELS ===================== */
 
 class Room {
+  final String id;
   final String name;
   final String type;
   final String building;
@@ -561,6 +620,7 @@ class Room {
   final List<RoomTag> tags;
 
   Room({
+    required this.id,
     required this.name,
     required this.type,
     required this.building,
@@ -568,6 +628,47 @@ class Room {
     required this.isAvailable,
     required this.tags,
   });
+
+  factory Room.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+
+    // Parse Features list strings to RoomTag objects
+    List<RoomTag> parsedTags = [];
+    if (data['features'] != null) {
+      final featuresList = List<String>.from(data['features']);
+      parsedTags = featuresList.map((featureName) {
+        return RoomTag(
+          label: featureName,
+          icon: _getIconForFeature(featureName),
+        );
+      }).toList();
+    }
+
+    return Room(
+      id: doc.id,
+      name: data['name'] ?? 'Unknown Room',
+      type: data['type'] ?? 'General',
+      building: data['building'] ?? '',
+      floor: data['floor'] ?? '',
+      isAvailable: data['isAvailable'] ?? true,
+      tags: parsedTags,
+    );
+  }
+}
+
+// Helper to map string features from DB to Icons
+IconData _getIconForFeature(String feature) {
+  switch (feature) {
+    case 'Projector': return Icons.videocam;
+    case 'Air-con': return Icons.ac_unit;
+    case 'Whiteboard': return Icons.edit_square;
+    case 'Smart TV': return Icons.tv;
+    case 'WiFi': return Icons.wifi;
+    case 'Computers': return Icons.computer;
+    case 'Sound System': return Icons.speaker;
+    case 'Laboratory Eqpt.': return Icons.science;
+    default: return Icons.star_outline;
+  }
 }
 
 class RoomTag {
@@ -579,52 +680,3 @@ class RoomTag {
     required this.label,
   });
 }
-
-/* ===================== SAMPLE DATA ===================== */
-
-final List<Room> sampleRooms = [
-  Room(
-    name: 'PTC 305',
-    type: 'Classroom',
-    building: 'PTC Building',
-    floor: '3rd Floor',
-    isAvailable: true,
-    tags: [
-      RoomTag(icon: Icons.tv, label: 'Projector'),
-      RoomTag(icon: Icons.chair, label: 'Student Chairs'),
-    ],
-  ),
-  Room(
-    name: 'PTC 306',
-    type: 'Classroom',
-    building: 'PTC Building',
-    floor: '3rd Floor',
-    isAvailable: false,
-    tags: [
-      RoomTag(icon: Icons.tv, label: 'Projector'),
-      RoomTag(icon: Icons.wifi, label: 'Wi-Fi'),
-    ],
-  ),
-  Room(
-    name: 'ITS 200',
-    type: 'Laboratory',
-    building: 'ITS Building',
-    floor: '2nd Floor',
-    isAvailable: true,
-    tags: [
-      RoomTag(icon: Icons.computer, label: 'Computers'),
-      RoomTag(icon: Icons.wifi, label: 'Networked'),
-    ],
-  ),
-  Room(
-    name: 'ITS 201',
-    type: 'Laboratory',
-    building: 'ITS Building',
-    floor: '2nd Floor',
-    isAvailable: false,
-    tags: [
-      RoomTag(icon: Icons.computer, label: 'Computers'),
-      RoomTag(icon: Icons.ac_unit, label: 'Air-Conditioned'),
-    ],
-  ),
-];

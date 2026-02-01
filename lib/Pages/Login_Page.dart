@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -26,6 +27,35 @@ class _LoginPageState extends State<LoginPage> {
   // IMPORTANT: single GoogleSignIn instance
   final GoogleSignIn _googleSignIn = GoogleSignIn();
 
+  // ---------------- FIRESTORE SAVE LOGIC ----------------
+  // Ensures the user document exists in Firestore upon login
+  // Now matches the fields used in RegisterPage
+  Future<void> _saveUserToFirestore(User user) async {
+    try {
+      final userDoc = FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid);
+
+      final docSnapshot = await userDoc.get();
+
+      // Only set data if user doesn't exist (e.g. first time Google login)
+      if (!docSnapshot.exists) {
+        await userDoc.set({
+          'name': user.displayName ?? 'Unknown User',
+          'email': user.email,
+          'role': 'student',      // Default role
+          'organization': '',     // Default organization
+          'isActive': true,       // Added to match RegisterPage
+          'isEmailVerified': user.emailVerified, // Added to match RegisterPage
+          'createdAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(), // Added to match RegisterPage
+        });
+      }
+    } catch (e) {
+      debugPrint('Error ensuring user data in Firestore: $e');
+    }
+  }
+
   // ---------------- EMAIL/PASSWORD LOGIN ----------------
   Future<void> _loginWithEmail() async {
     final email = _emailController.text.trim();
@@ -39,10 +69,15 @@ class _LoginPageState extends State<LoginPage> {
     setState(() => _loadingMethod = LoginMethod.email);
 
     try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
+      final UserCredential credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
+
+      // Ensure firestore doc exists
+      if (credential.user != null) {
+        await _saveUserToFirestore(credential.user!);
+      }
 
       if (!mounted) return;
 
@@ -87,7 +122,12 @@ class _LoginPageState extends State<LoginPage> {
         idToken: googleAuth.idToken,
       );
 
-      await FirebaseAuth.instance.signInWithCredential(credential);
+      final UserCredential userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
+
+      // Ensure firestore doc exists (Critical for Google Sign In as it acts as registration too)
+      if (userCredential.user != null) {
+        await _saveUserToFirestore(userCredential.user!);
+      }
 
       if (!mounted) return;
 
@@ -222,6 +262,8 @@ class _LoginPageState extends State<LoginPage> {
                                     : 'lib/assets/images/eye open.png',
                                 width: 20,
                                 height: 20,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility, color: Colors.grey),
                               ),
                             ),
                           ),
@@ -307,6 +349,8 @@ class _LoginPageState extends State<LoginPage> {
                                 'lib/assets/images/google icon.png',
                                 height: 22,
                                 width: 22,
+                                errorBuilder: (context, error, stackTrace) =>
+                                const Icon(Icons.g_mobiledata, size: 30),
                               ),
                               const SizedBox(width: 10),
                               const Text(

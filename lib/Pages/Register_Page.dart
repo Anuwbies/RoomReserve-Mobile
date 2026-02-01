@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -34,8 +35,7 @@ class _RegisterPageState extends State<RegisterPage> {
       hintStyle: const TextStyle(color: Colors.grey),
       filled: true,
       fillColor: const Color(0xFFF9FAFB),
-      contentPadding:
-      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
         borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
@@ -51,6 +51,34 @@ class _RegisterPageState extends State<RegisterPage> {
     );
   }
 
+  // ---------------- FIRESTORE SAVE LOGIC ----------------
+  Future<void> _saveUserToFirestore(User user, String fullName) async {
+    try {
+      // Use root-level 'users' collection as requested
+      final userDoc = FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid);
+
+      final docSnapshot = await userDoc.get();
+
+      // Only set data if user doesn't exist to prevent overwriting roles
+      if (!docSnapshot.exists) {
+        await userDoc.set({
+          'name': fullName,
+          'email': user.email,
+          'role': 'student', // Default role
+          'organization': '', // Default organization is blank
+          'isActive': true,
+          'isEmailVerified': user.emailVerified,
+          'createdAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
+    } catch (e) {
+      debugPrint('Error saving user data: $e');
+    }
+  }
+
   // ---------------- EMAIL / PASSWORD REGISTER ----------------
   Future<void> _register() async {
     final firstName = _firstNameController.text.trim();
@@ -59,8 +87,7 @@ class _RegisterPageState extends State<RegisterPage> {
     final password = _passwordController.text;
     final confirmPassword = _confirmPasswordController.text;
 
-    if ([firstName, lastName, email, password]
-        .any((value) => value.isEmpty)) {
+    if ([firstName, lastName, email, password].any((value) => value.isEmpty)) {
       _showError('All fields are required');
       return;
     }
@@ -82,10 +109,14 @@ class _RegisterPageState extends State<RegisterPage> {
       final user = credential.user;
 
       if (user != null) {
-        await user.updateDisplayName('$firstName $lastName');
+        final fullName = '$firstName $lastName';
+        await user.updateDisplayName(fullName);
         await user.reload();
 
-        // Do not keep user logged in
+        // Save to Firestore BEFORE signing out
+        await _saveUserToFirestore(user, fullName);
+
+        // Do not keep user logged in for email registration flow
         await FirebaseAuth.instance.signOut();
       }
 
@@ -111,8 +142,7 @@ class _RegisterPageState extends State<RegisterPage> {
     try {
       await _googleSignIn.signOut();
 
-      final GoogleSignInAccount? googleUser =
-      await _googleSignIn.signIn();
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
 
       if (googleUser == null) {
         if (mounted) setState(() => _loadingMethod = RegisterMethod.none);
@@ -122,13 +152,22 @@ class _RegisterPageState extends State<RegisterPage> {
       final GoogleSignInAuthentication googleAuth =
       await googleUser.authentication;
 
-      final AuthCredential credential =
-      GoogleAuthProvider.credential(
+      final AuthCredential credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
+      final UserCredential userCredential =
       await FirebaseAuth.instance.signInWithCredential(credential);
+      final user = userCredential.user;
+
+      if (user != null) {
+        // Save to Firestore
+        await _saveUserToFirestore(
+          user,
+          user.displayName ?? 'Google User',
+        );
+      }
 
       if (!mounted) return;
 
@@ -139,7 +178,6 @@ class _RegisterPageState extends State<RegisterPage> {
         ),
             (route) => false,
       );
-
     } catch (_) {
       _showError('Google sign-in failed. Please try again.');
       if (mounted) setState(() => _loadingMethod = RegisterMethod.none);
@@ -182,7 +220,6 @@ class _RegisterPageState extends State<RegisterPage> {
           child: Column(
             children: [
               const SizedBox(height: 16),
-
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: Align(
@@ -193,7 +230,6 @@ class _RegisterPageState extends State<RegisterPage> {
                   ),
                 ),
               ),
-
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -201,7 +237,6 @@ class _RegisterPageState extends State<RegisterPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SizedBox(height: 16),
-
                       const Text(
                         'Hello! Register to get started',
                         style: TextStyle(
@@ -209,43 +244,35 @@ class _RegisterPageState extends State<RegisterPage> {
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-
                       const SizedBox(height: 16),
-
                       TextField(
                         controller: _firstNameController,
                         decoration: _inputDecoration('First Name'),
                       ),
                       const SizedBox(height: 16),
-
                       TextField(
                         controller: _lastNameController,
                         decoration: _inputDecoration('Last Name'),
                       ),
                       const SizedBox(height: 16),
-
                       TextField(
                         controller: _emailController,
                         decoration: _inputDecoration('Email'),
                         keyboardType: TextInputType.emailAddress,
                       ),
                       const SizedBox(height: 16),
-
                       TextField(
                         controller: _passwordController,
                         decoration: _inputDecoration('Password'),
                         obscureText: true,
                       ),
                       const SizedBox(height: 16),
-
                       TextField(
                         controller: _confirmPasswordController,
                         decoration: _inputDecoration('Confirm password'),
                         obscureText: true,
                       ),
-
                       const SizedBox(height: 28),
-
                       SizedBox(
                         width: double.infinity,
                         height: 52,
@@ -275,9 +302,7 @@ class _RegisterPageState extends State<RegisterPage> {
                           ),
                         ),
                       ),
-
                       const SizedBox(height: 24),
-
                       Row(
                         children: const [
                           Expanded(child: Divider()),
@@ -291,9 +316,7 @@ class _RegisterPageState extends State<RegisterPage> {
                           Expanded(child: Divider()),
                         ],
                       ),
-
                       const SizedBox(height: 20),
-
                       SizedBox(
                         width: double.infinity,
                         height: 52,
@@ -307,8 +330,7 @@ class _RegisterPageState extends State<RegisterPage> {
                               borderRadius: BorderRadius.circular(8),
                             ),
                           ),
-                          child: _loadingMethod ==
-                              RegisterMethod.google
+                          child: _loadingMethod == RegisterMethod.google
                               ? const SizedBox(
                             width: 22,
                             height: 22,
@@ -318,13 +340,16 @@ class _RegisterPageState extends State<RegisterPage> {
                             ),
                           )
                               : Row(
-                            mainAxisAlignment:
-                            MainAxisAlignment.center,
+                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Image.asset(
                                 'lib/assets/images/google icon.png',
                                 height: 22,
                                 width: 22,
+                                errorBuilder:
+                                    (context, error, stackTrace) =>
+                                const Icon(Icons.g_mobiledata,
+                                    size: 30),
                               ),
                               const SizedBox(width: 10),
                               const Text(
@@ -343,15 +368,13 @@ class _RegisterPageState extends State<RegisterPage> {
                   ),
                 ),
               ),
-
               Padding(
                 padding: const EdgeInsets.only(bottom: 24),
                 child: Center(
                   child: RichText(
                     text: TextSpan(
                       text: 'Already have an account? ',
-                      style:
-                      const TextStyle(color: Colors.black),
+                      style: const TextStyle(color: Colors.black),
                       children: [
                         TextSpan(
                           text: 'Login Now',
