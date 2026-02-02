@@ -1,5 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  // Initialize Firebase
+  await Firebase.initializeApp();
+  runApp(const MaterialApp(
+    debugShowCheckedModeBanner: false,
+    home: RoomsPage(),
+  ));
+}
 
 class RoomsPage extends StatefulWidget {
   const RoomsPage({super.key});
@@ -19,6 +31,19 @@ class _RoomsPageState extends State<RoomsPage> {
   String? _selectedFloor;
 
   @override
+  void initState() {
+    super.initState();
+    _signInAnonymously();
+  }
+
+  Future<void> _signInAnonymously() async {
+    // Ensure we are signed in before querying Firestore
+    if (FirebaseAuth.instance.currentUser == null) {
+      await FirebaseAuth.instance.signInAnonymously();
+    }
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
@@ -26,140 +51,142 @@ class _RoomsPageState extends State<RoomsPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Firestore Query
-    // Using strict path: /artifacts/{appId}/public/data/{collectionName}
+    // PRODUCTION: Use `FirebaseFirestore.instance.collection('rooms').snapshots();`
     const String appId = 'default-app-id';
     final Stream<QuerySnapshot> roomsStream = FirebaseFirestore.instance
-        .collection('artifacts')
-        .doc(appId)
-        .collection('public')
-        .doc('data')
         .collection('rooms')
-        .orderBy('createdAt', descending: true) // Optional: Show newest first
         .snapshots();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
       body: SafeArea(
-        child: Column(
-          children: [
-            /* SEARCH BAR & FILTER */
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _searchController,
-                      onChanged: (value) {
-                        setState(() {
-                          _query = value.trim().toLowerCase();
-                        });
-                      },
-                      decoration: InputDecoration(
-                        hintText: 'Search...',
-                        prefixIcon: const Icon(Icons.search),
-                        prefixIconConstraints: const BoxConstraints(
-                          minWidth: 40,
-                          minHeight: 40,
-                        ),
-                        filled: true,
-                        fillColor: Colors.white,
-                        contentPadding: const EdgeInsets.symmetric(vertical: 0),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  GestureDetector(
-                    onTap: _showFilterSheet,
-                    child: Container(
-                      height: 48,
-                      width: 48,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Icon(
-                        Icons.tune,
-                        color: _hasActiveFilters()
-                            ? Theme.of(context).primaryColor
-                            : Colors.grey.shade600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+        child: StreamBuilder<QuerySnapshot>(
+          stream: roomsStream,
+          builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return Center(child: Text('Error: ${snapshot.error}'));
+            }
 
-            /* ACTIVE FILTER INDICATOR */
-            if (_hasActiveFilters())
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                child: Row(
-                  children: [
-                    Text(
-                      'Filters active',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Theme.of(context).primaryColor,
-                        fontWeight: FontWeight.bold,
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            // 1. Convert Firestore Docs to Room Objects
+            final allRooms = snapshot.data!.docs.map((doc) {
+              return Room.fromFirestore(doc);
+            }).toList();
+
+            // 2. Extract Unique Values for Filters (Dynamic Content)
+            final uniqueTypes = allRooms.map((r) => r.type).toSet().toList()..sort();
+            final uniqueBuildings = allRooms.map((r) => r.building).toSet().toList()..sort();
+            final uniqueFloors = allRooms.map((r) => r.floor).toSet().toList()..sort();
+
+            // 3. Apply Client-Side Filtering
+            final filteredRooms = _filterRooms(allRooms, _query);
+
+            // 4. Group by Type
+            final groupedRooms = _groupRoomsByType(filteredRooms);
+
+            return Column(
+              children: [
+                /* SEARCH BAR & FILTER */
+                Container(
+                  color: Colors.white,
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _searchController,
+                          onChanged: (value) {
+                            setState(() {
+                              _query = value.trim().toLowerCase();
+                            });
+                          },
+                          decoration: InputDecoration(
+                            hintText: 'Search...',
+                            prefixIcon: const Icon(Icons.search),
+                            prefixIconConstraints: const BoxConstraints(
+                              minWidth: 40,
+                              minHeight: 40,
+                            ),
+                            filled: true,
+                            fillColor: const Color(0xFFF5F6FA),
+                            contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: BorderSide.none,
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
-                    const Spacer(),
-                    GestureDetector(
-                      onTap: _clearFilters,
-                      child: const Text(
-                        'Clear all',
-                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                      const SizedBox(width: 10),
+                      GestureDetector(
+                        onTap: () => _showFilterSheet(
+                          types: uniqueTypes,
+                          buildings: uniqueBuildings,
+                          floors: uniqueFloors,
+                        ),
+                        child: Container(
+                          height: 48,
+                          width: 48,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF5F6FA),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(
+                            Icons.tune,
+                            color: _hasActiveFilters()
+                                ? Theme.of(context).primaryColor
+                                : Colors.grey.shade600,
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
 
-            /* ROOM LIST STREAM */
-            Expanded(
-              child: StreamBuilder<QuerySnapshot>(
-                stream: roomsStream,
-                builder: (context, snapshot) {
-                  if (snapshot.hasError) {
-                    return Center(child: Text('Error: ${snapshot.error}'));
-                  }
+                /* ACTIVE FILTER INDICATOR */
+                if (_hasActiveFilters())
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    child: Row(
+                      children: [
+                        Text(
+                          'Filters active',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Theme.of(context).primaryColor,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const Spacer(),
+                        GestureDetector(
+                          onTap: _clearFilters,
+                          child: const Text(
+                            'Clear all',
+                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
 
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-
-                  // 1. Convert Firestore Docs to Room Objects
-                  final allRooms = snapshot.data!.docs.map((doc) {
-                    return Room.fromFirestore(doc);
-                  }).toList();
-
-                  // 2. Apply Client-Side Filtering
-                  final filteredRooms = _filterRooms(allRooms, _query);
-
-                  if (filteredRooms.isEmpty) {
-                    return const Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.search_off, size: 48, color: Colors.grey),
-                          SizedBox(height: 16),
-                          Text("No rooms found", style: TextStyle(color: Colors.grey)),
-                        ],
-                      ),
-                    );
-                  }
-
-                  // 3. Group by Type
-                  final groupedRooms = _groupRoomsByType(filteredRooms);
-
-                  return ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                /* ROOM LIST VIEW */
+                Expanded(
+                  child: filteredRooms.isEmpty
+                      ? const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.search_off, size: 48, color: Colors.grey),
+                        SizedBox(height: 16),
+                        Text("No rooms found", style: TextStyle(color: Colors.grey)),
+                      ],
+                    ),
+                  )
+                      : ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
                     itemCount: groupedRooms.length,
                     itemBuilder: (context, index) {
                       final entry = groupedRooms.entries.elementAt(index);
@@ -168,11 +195,11 @@ class _RoomsPageState extends State<RoomsPage> {
                         rooms: entry.value,
                       );
                     },
-                  );
-                },
-              ),
-            ),
-          ],
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -237,16 +264,11 @@ class _RoomsPageState extends State<RoomsPage> {
 
   /* ===================== UI HELPERS ===================== */
 
-  void _showFilterSheet() {
-    // Note: In a real app with Firestore, getting unique values for filters
-    // might require a separate aggregation query or iterating the current list.
-    // For simplicity, we'll keep hardcoded lists or you can derive them from 'allRooms'
-    // if you pass them into this method. Here I'll use standard lists.
-
-    final types = ['Classroom', 'Laboratory', 'Meeting Room', 'Auditorium', 'Office'];
-    final buildings = ['PTC Building', 'ITS Building', 'Main Building', 'Engineering', 'Science Wing'];
-    final floors = ['Ground Floor', '1st Floor', '2nd Floor', '3rd Floor', '4th Floor'];
-
+  void _showFilterSheet({
+    required List<String> types,
+    required List<String> buildings,
+    required List<String> floors,
+  }) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -259,9 +281,9 @@ class _RoomsPageState extends State<RoomsPage> {
             return Padding(
               padding: EdgeInsets.fromLTRB(
                 20,
+                10,
                 20,
-                20,
-                MediaQuery.of(context).viewInsets.bottom + 20,
+                MediaQuery.of(context).viewInsets.bottom +25,
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -285,7 +307,7 @@ class _RoomsPageState extends State<RoomsPage> {
                       )
                     ],
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 5),
                   _buildDropdown(
                     label: 'Availability',
                     value: _selectedAvailability,
@@ -299,6 +321,7 @@ class _RoomsPageState extends State<RoomsPage> {
                     label: 'Type',
                     value: _selectedType,
                     items: types,
+                    capitalizeItems: true, // Only capitalize types (e.g. "classroom" -> "Classroom")
                     onChanged: (val) {
                       setModalState(() => _selectedType = val);
                       setState(() {});
@@ -308,6 +331,7 @@ class _RoomsPageState extends State<RoomsPage> {
                     label: 'Building',
                     value: _selectedBuilding,
                     items: buildings,
+                    capitalizeItems: false, // Keep original casing (e.g. "PTC Building")
                     onChanged: (val) {
                       setModalState(() => _selectedBuilding = val);
                       setState(() {});
@@ -317,12 +341,13 @@ class _RoomsPageState extends State<RoomsPage> {
                     label: 'Floor',
                     value: _selectedFloor,
                     items: floors,
+                    capitalizeItems: false, // Keep original casing (e.g. "1st Floor")
                     onChanged: (val) {
                       setModalState(() => _selectedFloor = val);
                       setState(() {});
                     },
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 10),
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
@@ -358,9 +383,10 @@ class _RoomsPageState extends State<RoomsPage> {
     required String? value,
     required List<String> items,
     required Function(String?) onChanged,
+    bool capitalizeItems = false,
   }) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -372,7 +398,7 @@ class _RoomsPageState extends State<RoomsPage> {
               fontWeight: FontWeight.w500,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 3),
           DropdownButtonFormField<String>(
             value: value,
             decoration: InputDecoration(
@@ -392,7 +418,7 @@ class _RoomsPageState extends State<RoomsPage> {
             items: items.map((item) {
               return DropdownMenuItem(
                 value: item,
-                child: Text(item),
+                child: Text(capitalizeItems ? capitalizeFirst(item) : item),
               );
             }).toList(),
             onChanged: onChanged,
@@ -420,10 +446,12 @@ class RoomTypeCard extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Card(
-      elevation: 2,
+      elevation: 0,
+      color: Colors.white,
       margin: const EdgeInsets.only(bottom: 16),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey.shade200),
       ),
       child: Padding(
         padding: const EdgeInsets.only(left: 10, right: 10, bottom: 10),
@@ -433,7 +461,7 @@ class RoomTypeCard extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(top: 10, bottom: 5),
               child: Text(
-                type,
+                capitalizeFirst(type),
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
@@ -512,7 +540,7 @@ class _RoomRow extends StatelessWidget {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      room.type,
+                      capitalizeFirst(room.type),
                       style: const TextStyle(
                         fontSize: 13,
                         color: Colors.grey,
@@ -551,8 +579,8 @@ class _RoomRow extends StatelessWidget {
                           ),
                         ),
                       ),
-                      // Display first few tags
-                      ...room.tags.take(3).map((tag) => Container(
+                      // Display first 1 tag only
+                      ...room.tags.take(1).map((tag) => Container(
                         margin: const EdgeInsets.only(right: 6),
                         padding: const EdgeInsets.symmetric(
                           horizontal: 8,
@@ -578,7 +606,8 @@ class _RoomRow extends StatelessWidget {
                           ],
                         ),
                       )),
-                      if (room.tags.length > 3)
+                      // If more than 1 tag, show remaining count
+                      if (room.tags.length > 1)
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 8,
@@ -589,7 +618,7 @@ class _RoomRow extends StatelessWidget {
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
-                            '+${room.tags.length - 3}',
+                            '+${room.tags.length - 1}',
                             style: const TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w500,
@@ -609,6 +638,11 @@ class _RoomRow extends StatelessWidget {
 }
 
 /* ===================== DATA MODELS ===================== */
+
+String capitalizeFirst(String value) {
+  if (value.isEmpty) return value;
+  return value[0].toUpperCase() + value.substring(1).toLowerCase();
+}
 
 class Room {
   final String id;
@@ -632,11 +666,21 @@ class Room {
   factory Room.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
 
-    // Parse Features list strings to RoomTag objects
+    // 1. Parse Location (Map)
+    final location = data['location'] as Map<String, dynamic>? ?? {};
+    final building = location['building'] as String? ?? 'Unknown';
+    final floor = location['floor'] as String? ?? '';
+
+    // 2. Parse Status (String)
+    // "available" -> true, "maintenance"/"occupied" -> false
+    final status = (data['status'] as String? ?? '').toLowerCase();
+    final isAvailable = status == 'available';
+
+    // 3. Parse Tags (Array of Strings)
     List<RoomTag> parsedTags = [];
-    if (data['features'] != null) {
-      final featuresList = List<String>.from(data['features']);
-      parsedTags = featuresList.map((featureName) {
+    if (data['tags'] != null) {
+      final tagsList = List<String>.from(data['tags']);
+      parsedTags = tagsList.map((featureName) {
         return RoomTag(
           label: featureName,
           icon: _getIconForFeature(featureName),
@@ -648,9 +692,9 @@ class Room {
       id: doc.id,
       name: data['name'] ?? 'Unknown Room',
       type: data['type'] ?? 'General',
-      building: data['building'] ?? '',
-      floor: data['floor'] ?? '',
-      isAvailable: data['isAvailable'] ?? true,
+      building: building,
+      floor: floor,
+      isAvailable: isAvailable,
       tags: parsedTags,
     );
   }
@@ -658,17 +702,16 @@ class Room {
 
 // Helper to map string features from DB to Icons
 IconData _getIconForFeature(String feature) {
-  switch (feature) {
-    case 'Projector': return Icons.videocam;
-    case 'Air-con': return Icons.ac_unit;
-    case 'Whiteboard': return Icons.edit_square;
-    case 'Smart TV': return Icons.tv;
-    case 'WiFi': return Icons.wifi;
-    case 'Computers': return Icons.computer;
-    case 'Sound System': return Icons.speaker;
-    case 'Laboratory Eqpt.': return Icons.science;
-    default: return Icons.star_outline;
-  }
+  final f = feature.toLowerCase();
+  if (f.contains('projector')) return Icons.videocam;
+  if (f.contains('ac') || f.contains('air-con')) return Icons.ac_unit;
+  if (f.contains('whiteboard')) return Icons.edit_square;
+  if (f.contains('tv')) return Icons.tv;
+  if (f.contains('wifi')) return Icons.wifi;
+  if (f.contains('computer') || f.contains('pc')) return Icons.computer;
+  if (f.contains('sound') || f.contains('speaker')) return Icons.speaker;
+  if (f.contains('lab') || f.contains('equipment')) return Icons.science;
+  return Icons.star_outline;
 }
 
 class RoomTag {

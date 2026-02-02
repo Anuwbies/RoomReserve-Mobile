@@ -17,7 +17,7 @@ class _MinWidthTab extends StatelessWidget {
     return Tab(
       child: Container(
         constraints: const BoxConstraints(
-          minWidth: 50, // adjust to taste (80–100 works well)
+          minWidth: 40, // adjust to taste (80–100 works well)
         ),
         alignment: Alignment.center,
         padding: const EdgeInsets.symmetric(horizontal: 12),
