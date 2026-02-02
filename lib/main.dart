@@ -1,14 +1,23 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:provider/provider.dart';
 
 import 'Pages/Welcome_Page.dart';
 import 'Pages/NavigationBar_Page.dart';
+import 'l10n/app_localizations.dart';
+import 'providers/locale_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
-  runApp(const RoomReserveApp());
+  runApp(
+    ChangeNotifierProvider(
+      create: (_) => LocaleProvider(),
+      child: const RoomReserveApp(),
+    ),
+  );
 }
 
 class RoomReserveApp extends StatelessWidget {
@@ -16,6 +25,8 @@ class RoomReserveApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final localeProvider = Provider.of<LocaleProvider>(context);
+
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: '1RoomReserve',
@@ -25,6 +36,17 @@ class RoomReserveApp extends StatelessWidget {
           seedColor: Colors.blue,
         ),
       ),
+      locale: localeProvider.locale,
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('en'),
+        Locale('ja'),  // Japanese
+      ],
       home: const AuthGate(),
     );
   }

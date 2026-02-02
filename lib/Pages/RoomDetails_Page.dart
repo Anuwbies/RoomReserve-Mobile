@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:ntp/ntp.dart';
 import 'package:intl/intl.dart';
 import 'Rooms_Page.dart'; // Import to access the Room and RoomTag classes
+import '../l10n/app_localizations.dart';
 
 class RoomDetailsPage extends StatefulWidget {
   final Room room;
@@ -39,29 +40,38 @@ class _RoomDetailsPageState extends State<RoomDetailsPage> {
     }
   }
 
-  String _formatDuration(int minutes) {
-    if (minutes == 0) return "0 mins";
+  String _formatDuration(int minutes, AppLocalizations l10n) {
+    if (minutes == 0) return "0 ${l10n.get('mins')}";
     if (minutes >= 60 && minutes % 60 == 0) {
       int hours = minutes ~/ 60;
-      return "$hours ${hours == 1 ? 'Hour' : 'Hours'}";
+      return "$hours ${hours == 1 ? l10n.get('hour') : l10n.get('hours')}";
     }
-    return "$minutes mins";
+    return "$minutes ${l10n.get('mins')}";
+  }
+
+  String _getDayName(int day, BuildContext context) {
+    // 1=Mon, ..., 7=Sun
+    // Jan 1, 2024 was a Monday
+    final date = DateTime(2024, 1, day);
+    final locale = Localizations.localeOf(context).languageCode;
+    return DateFormat('EEE', locale).format(date);
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final room = widget.room;
     final colorScheme = Theme.of(context).colorScheme;
     final isAvailable = room.isAvailable;
     final statusColor = isAvailable ? Colors.green : Colors.red;
-    final statusText = isAvailable ? 'Available' : 'Occupied';
+    final statusText = isAvailable ? l10n.get('available') : l10n.get('occupied');
 
     // Parse Availability
     final avail = room.availability;
     final startTime = avail['startTime'] as String? ?? 'N/A';
     final endTime = avail['endTime'] as String? ?? 'N/A';
     final daysList = (avail['daysOfWeek'] as List<dynamic>?)?.cast<int>() ?? [];
-    final daysString = daysList.map(_getDayName).join(' • ');
+    final daysString = daysList.map((d) => _getDayName(d, context)).join(' • ');
 
     // Parse Booking Rules
     final rules = room.bookingRules;
@@ -76,7 +86,8 @@ class _RoomDetailsPageState extends State<RoomDetailsPage> {
         : room.description;
 
     // Date Format
-    final formattedDate = DateFormat('EEEE, MMM d • HH:mm').format(_now);
+    final locale = Localizations.localeOf(context).toString();
+    final formattedDate = DateFormat('EEEE, MMM d • HH:mm', locale).format(_now);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
@@ -166,7 +177,7 @@ class _RoomDetailsPageState extends State<RoomDetailsPage> {
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
-                              "LIVE",
+                              l10n.get('live'),
                               style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold,
@@ -272,7 +283,7 @@ class _RoomDetailsPageState extends State<RoomDetailsPage> {
                             TextSpan(text: displayDescription),
                             if (isDescriptionLong)
                               TextSpan(
-                                text: _isDescriptionExpanded ? " See Less" : " See More",
+                                text: _isDescriptionExpanded ? " ${l10n.get('seeLess')}" : " ${l10n.get('seeMore')}",
                                 style: TextStyle(
                                   fontSize: 14,
                                   color: colorScheme.primary,
@@ -288,7 +299,7 @@ class _RoomDetailsPageState extends State<RoomDetailsPage> {
                   const SizedBox(height: 24),
 
                   // 3. Location & Capacity Info
-                  _SectionHeader(title: "Info"),
+                  _SectionHeader(title: l10n.get('info')),
                   const SizedBox(height: 12),
                   Container(
                     padding: const EdgeInsets.all(20),
@@ -308,21 +319,21 @@ class _RoomDetailsPageState extends State<RoomDetailsPage> {
                         children: [
                           _InfoItem(
                             icon: Icons.business_rounded,
-                            label: "Building",
+                            label: l10n.get('building'),
                             value: room.building,
                           ),
                           VerticalDivider(
                               width: 30, color: Colors.grey.shade200),
                           _InfoItem(
                             icon: Icons.layers_rounded,
-                            label: "Floor",
+                            label: l10n.get('floor'),
                             value: room.floor,
                           ),
                           VerticalDivider(
                               width: 30, color: Colors.grey.shade200),
                           _InfoItem(
                             icon: Icons.people_outline_rounded,
-                            label: "Capacity",
+                            label: l10n.get('capacity'),
                             value: "${room.capacity}",
                           ),
                         ],
@@ -332,7 +343,7 @@ class _RoomDetailsPageState extends State<RoomDetailsPage> {
                   const SizedBox(height: 28),
 
                   // 4. Availability
-                  _SectionHeader(title: "Availability"),
+                  _SectionHeader(title: l10n.get('availability')),
                   const SizedBox(height: 12),
                   Container(
                     padding: const EdgeInsets.all(20),
@@ -412,7 +423,7 @@ class _RoomDetailsPageState extends State<RoomDetailsPage> {
                   const SizedBox(height: 28),
 
                   // 5. Booking Rules
-                  _SectionHeader(title: "Booking Rules"),
+                  _SectionHeader(title: l10n.get('bookingRules')),
                   const SizedBox(height: 12),
                   Container(
                     padding: const EdgeInsets.all(20),
@@ -430,17 +441,17 @@ class _RoomDetailsPageState extends State<RoomDetailsPage> {
                     child: Column(
                       children: [
                         _RuleRow(
-                            label: "Min Duration", value: _formatDuration(minDuration)),
+                            label: l10n.get('minDuration'), value: _formatDuration(minDuration, l10n)),
                         Divider(color: Colors.grey.shade100),
                         _RuleRow(
-                            label: "Max Duration", value: _formatDuration(maxDuration)),
+                            label: l10n.get('maxDuration'), value: _formatDuration(maxDuration, l10n)),
                         Divider(color: Colors.grey.shade100),
                         _RuleRow(
-                            label: "Advance Booking", value: "$advanceDays days"),
+                            label: l10n.get('advanceBooking'), value: "$advanceDays ${l10n.get('days')}"),
                         Divider(color: Colors.grey.shade100),
                         _RuleRow(
-                          label: "Approval Required",
-                          value: requiresApproval ? "Yes" : "No",
+                          label: l10n.get('approvalRequired'),
+                          value: requiresApproval ? l10n.get('yes') : l10n.get('no'),
                           valueColor: requiresApproval
                               ? Colors.orange.shade700
                               : Colors.green.shade600,
@@ -452,7 +463,7 @@ class _RoomDetailsPageState extends State<RoomDetailsPage> {
 
                   // 6. Features / Tags
                   if (room.tags.isNotEmpty) ...[
-                    _SectionHeader(title: "Features & Amenities"),
+                    _SectionHeader(title: l10n.get('features')),
                     const SizedBox(height: 12),
                     Wrap(
                       spacing: 8,
@@ -536,7 +547,7 @@ class _RoomDetailsPageState extends State<RoomDetailsPage> {
                     elevation: 0,
                   ),
                   child: Text(
-                    isAvailable ? "Reserve This Room" : "Currently Unavailable",
+                    isAvailable ? l10n.get('reserveRoom') : l10n.get('currentlyUnavailable'),
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -550,27 +561,6 @@ class _RoomDetailsPageState extends State<RoomDetailsPage> {
         ],
       ),
     );
-  }
-
-  String _getDayName(int day) {
-    switch (day) {
-      case 1:
-        return 'Mon';
-      case 2:
-        return 'Tue';
-      case 3:
-        return 'Wed';
-      case 4:
-        return 'Thu';
-      case 5:
-        return 'Fri';
-      case 6:
-        return 'Sat';
-      case 7:
-        return 'Sun';
-      default:
-        return '';
-    }
   }
 }
 

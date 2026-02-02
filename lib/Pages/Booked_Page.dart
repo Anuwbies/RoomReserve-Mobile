@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async'; // Import for Timer
 
 class BookedPage extends StatefulWidget {
   const BookedPage({super.key});
@@ -32,6 +33,7 @@ class _BookedPageState extends State<BookedPage>
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
+  Timer? _debounce;
 
   @override
   void initState() {
@@ -44,6 +46,7 @@ class _BookedPageState extends State<BookedPage>
   void dispose() {
     _tabController.dispose();
     _searchController.dispose();
+    _debounce?.cancel();
     super.dispose();
   }
 
@@ -86,8 +89,11 @@ class _BookedPageState extends State<BookedPage>
               child: TextField(
                 controller: _searchController,
                 onChanged: (value) {
-                  setState(() {
-                    _query = value.trim().toLowerCase();
+                  if (_debounce?.isActive ?? false) _debounce!.cancel();
+                  _debounce = Timer(const Duration(milliseconds: 1000), () {
+                    setState(() {
+                      _query = value.trim().toLowerCase();
+                    });
                   });
                 },
                 decoration: InputDecoration(

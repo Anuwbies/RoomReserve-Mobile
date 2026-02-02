@@ -6,6 +6,7 @@ import 'Booked_Page.dart';
 import 'Home_Page.dart';
 import 'Profile_Page.dart';
 import 'Rooms_Page.dart';
+import '../l10n/app_localizations.dart';
 
 class NavigationBarPage extends StatefulWidget {
   const NavigationBarPage({super.key});
@@ -26,6 +27,8 @@ class _NavigationBarPageState extends State<NavigationBarPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return Scaffold(
       body: _pages[_selectedIndex],
       bottomNavigationBar: SizedBox(height: 62,
@@ -61,7 +64,7 @@ class _NavigationBarPageState extends State<NavigationBarPage> {
                   BlendMode.srcIn,
                 ),
               ),
-              title: const Text('Home'),
+              title: Text(l10n.get('home')),
               selectedColor: Colors.blue,
               unSelectedColor: Colors.grey,
               backgroundColor: Colors.blue,
@@ -86,7 +89,7 @@ class _NavigationBarPageState extends State<NavigationBarPage> {
                   BlendMode.srcIn,
                 ),
               ),
-              title: const Text('Booked'),
+              title: Text(l10n.get('booked')),
               selectedColor: Colors.blue,
               unSelectedColor: Colors.grey,
               backgroundColor: Colors.blue,
@@ -111,7 +114,7 @@ class _NavigationBarPageState extends State<NavigationBarPage> {
                   BlendMode.srcIn,
                 ),
               ),
-              title: const Text('Rooms'),
+              title: Text(l10n.get('rooms')),
               selectedColor: Colors.blue,
               unSelectedColor: Colors.grey,
               backgroundColor: Colors.blue,
@@ -136,7 +139,7 @@ class _NavigationBarPageState extends State<NavigationBarPage> {
                   BlendMode.srcIn,
                 ),
               ),
-              title: const Text('Profile'),
+              title: Text(l10n.get('profile')),
               selectedColor: Colors.blue,
               unSelectedColor: Colors.grey,
               backgroundColor: Colors.blue,

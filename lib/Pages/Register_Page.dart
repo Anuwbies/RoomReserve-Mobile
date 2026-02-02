@@ -6,6 +6,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 
 import 'Login_Page.dart';
 import 'NavigationBar_Page.dart';
+import '../l10n/app_localizations.dart';
 
 enum RegisterMethod { none, email, google }
 
@@ -81,6 +82,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
   // ---------------- EMAIL / PASSWORD REGISTER ----------------
   Future<void> _register() async {
+    final l10n = AppLocalizations.of(context);
     final firstName = _firstNameController.text.trim();
     final lastName = _lastNameController.text.trim();
     final email = _emailController.text.trim();
@@ -88,12 +90,12 @@ class _RegisterPageState extends State<RegisterPage> {
     final confirmPassword = _confirmPasswordController.text;
 
     if ([firstName, lastName, email, password].any((value) => value.isEmpty)) {
-      _showError('All fields are required');
+      _showError(l10n.get('allFieldsRequired'));
       return;
     }
 
     if (password != confirmPassword) {
-      _showError('Passwords do not match');
+      _showError(l10n.get('passwordsDoNotMatch'));
       return;
     }
 
@@ -127,16 +129,17 @@ class _RegisterPageState extends State<RegisterPage> {
         MaterialPageRoute(builder: (_) => const LoginPage()),
       );
     } on FirebaseAuthException catch (e) {
-      _showError(e.message ?? 'Registration failed');
+      _showError(e.message ?? l10n.get('registrationFailed'));
       if (mounted) setState(() => _loadingMethod = RegisterMethod.none);
     } catch (_) {
-      _showError('Something went wrong. Please try again.');
+      _showError(l10n.get('somethingWentWrong'));
       if (mounted) setState(() => _loadingMethod = RegisterMethod.none);
     }
   }
 
   // ---------------- GOOGLE REGISTER ----------------
   Future<void> _signUpWithGoogle() async {
+    final l10n = AppLocalizations.of(context);
     setState(() => _loadingMethod = RegisterMethod.google);
 
     try {
@@ -179,7 +182,7 @@ class _RegisterPageState extends State<RegisterPage> {
             (route) => false,
       );
     } catch (_) {
-      _showError('Google sign-in failed. Please try again.');
+      _showError(l10n.get('googleSignInFailed'));
       if (mounted) setState(() => _loadingMethod = RegisterMethod.none);
     }
   }
@@ -211,6 +214,8 @@ class _RegisterPageState extends State<RegisterPage> {
   // ---------------- UI ----------------
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return Scaffold(
       resizeToAvoidBottomInset: false,
       backgroundColor: Colors.white,
@@ -237,9 +242,9 @@ class _RegisterPageState extends State<RegisterPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SizedBox(height: 16),
-                      const Text(
-                        'Hello! Register to get started',
-                        style: TextStyle(
+                      Text(
+                        l10n.get('helloRegister'),
+                        style: const TextStyle(
                           fontSize: 26,
                           fontWeight: FontWeight.w700,
                         ),
@@ -247,29 +252,29 @@ class _RegisterPageState extends State<RegisterPage> {
                       const SizedBox(height: 16),
                       TextField(
                         controller: _firstNameController,
-                        decoration: _inputDecoration('First Name'),
+                        decoration: _inputDecoration(l10n.get('firstName')),
                       ),
                       const SizedBox(height: 16),
                       TextField(
                         controller: _lastNameController,
-                        decoration: _inputDecoration('Last Name'),
+                        decoration: _inputDecoration(l10n.get('lastName')),
                       ),
                       const SizedBox(height: 16),
                       TextField(
                         controller: _emailController,
-                        decoration: _inputDecoration('Email'),
+                        decoration: _inputDecoration(l10n.get('email')),
                         keyboardType: TextInputType.emailAddress,
                       ),
                       const SizedBox(height: 16),
                       TextField(
                         controller: _passwordController,
-                        decoration: _inputDecoration('Password'),
+                        decoration: _inputDecoration(l10n.get('password')),
                         obscureText: true,
                       ),
                       const SizedBox(height: 16),
                       TextField(
                         controller: _confirmPasswordController,
-                        decoration: _inputDecoration('Confirm password'),
+                        decoration: _inputDecoration(l10n.get('confirmPassword')),
                         obscureText: true,
                       ),
                       const SizedBox(height: 28),
@@ -293,9 +298,9 @@ class _RegisterPageState extends State<RegisterPage> {
                               color: Colors.white,
                             ),
                           )
-                              : const Text(
-                            'Register',
-                            style: TextStyle(
+                              : Text(
+                            l10n.get('register'),
+                            style: const TextStyle(
                               color: Colors.white,
                               fontSize: 16,
                             ),
@@ -304,16 +309,16 @@ class _RegisterPageState extends State<RegisterPage> {
                       ),
                       const SizedBox(height: 24),
                       Row(
-                        children: const [
-                          Expanded(child: Divider()),
+                        children: [
+                          const Expanded(child: Divider()),
                           Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 12),
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
                             child: Text(
-                              'Or Register with',
-                              style: TextStyle(color: Colors.grey),
+                              l10n.get('orRegisterWith'),
+                              style: const TextStyle(color: Colors.grey),
                             ),
                           ),
-                          Expanded(child: Divider()),
+                          const Expanded(child: Divider()),
                         ],
                       ),
                       const SizedBox(height: 20),
@@ -352,9 +357,9 @@ class _RegisterPageState extends State<RegisterPage> {
                                     size: 30),
                               ),
                               const SizedBox(width: 10),
-                              const Text(
-                                'Google',
-                                style: TextStyle(
+                              Text(
+                                l10n.get('google'),
+                                style: const TextStyle(
                                   color: Colors.black,
                                   fontSize: 16,
                                 ),
@@ -373,11 +378,11 @@ class _RegisterPageState extends State<RegisterPage> {
                 child: Center(
                   child: RichText(
                     text: TextSpan(
-                      text: 'Already have an account? ',
+                      text: l10n.get('alreadyHaveAccount'),
                       style: const TextStyle(color: Colors.black),
                       children: [
                         TextSpan(
-                          text: 'Login Now',
+                          text: l10n.get('loginNow'),
                           style: const TextStyle(
                             color: Colors.blue,
                             fontWeight: FontWeight.w600,

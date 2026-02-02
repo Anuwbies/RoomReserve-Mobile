@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:async'; // Import for Timer
 import 'RoomDetails_Page.dart'; // Import Details Page
+import '../l10n/app_localizations.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,6 +26,8 @@ class RoomsPage extends StatefulWidget {
 class _RoomsPageState extends State<RoomsPage> {
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
+  late Stream<DocumentSnapshot> _userStream;
+  Timer? _debounce; // Timer for debounce
 
   // Filter States
   String? _selectedAvailability;
@@ -35,245 +39,260 @@ class _RoomsPageState extends State<RoomsPage> {
   void initState() {
     super.initState();
     _signInAnonymously();
+    _initUserStream();
+  }
+
+  void _initUserStream() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      _userStream = FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .snapshots();
+    } else {
+      _userStream = const Stream.empty();
+    }
   }
 
   Future<void> _signInAnonymously() async {
-    // Ensure we are signed in before querying Firestore
     if (FirebaseAuth.instance.currentUser == null) {
       await FirebaseAuth.instance.signInAnonymously();
+      setState(() {
+        _initUserStream();
+      });
     }
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _debounce?.cancel(); // Cancel timer
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final topPadding = MediaQuery.of(context).padding.top;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
-      body: SafeArea(
-        child: StreamBuilder<User?>(
-          stream: FirebaseAuth.instance.authStateChanges(),
-          builder: (context, authSnapshot) {
-            if (authSnapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
+      body: StreamBuilder<DocumentSnapshot>(
+        stream: _userStream,
+        builder: (context, userDocSnapshot) {
+          if (userDocSnapshot.hasError) {
+            return Center(
+                child: Text('Error loading profile: ${userDocSnapshot.error}'));
+          }
 
-            final user = authSnapshot.data;
-            if (user == null) {
-              return const Center(child: CircularProgressIndicator());
-            }
+          if (userDocSnapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-            return StreamBuilder<DocumentSnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('users')
-                  .doc(user.uid)
-                  .snapshots(),
-              builder: (context, userDocSnapshot) {
-                if (userDocSnapshot.hasError) {
-                  return Center(
-                      child: Text('Error loading profile: ${userDocSnapshot.error}'));
-                }
+          final userData =
+              userDocSnapshot.data?.data() as Map<String, dynamic>?;
+          final organizationName = userData?['organizationName'] as String?;
 
-                if (userDocSnapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                final userData =
-                    userDocSnapshot.data?.data() as Map<String, dynamic>?;
-                final organizationName = userData?['organizationName'] as String?;
-
-                if (organizationName == null || organizationName.isEmpty) {
-                  return Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(32.0),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.business_outlined,
-                              size: 64, color: Colors.grey.shade300),
-                          const SizedBox(height: 16),
-                          const Text(
-                            "No Organization Selected",
-                            style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.grey),
-                          ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            "Please go to your Profile to select an organization and view available rooms.",
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: Colors.grey),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                }
-
-                return StreamBuilder<QuerySnapshot>(
-                  stream: FirebaseFirestore.instance
-                      .collection('rooms')
-                      .where('organizationName', isEqualTo: organizationName)
-                      .snapshots(),
-                  builder: (context, snapshot) {
-                    if (snapshot.hasError) {
-                      return Center(child: Text('Error: ${snapshot.error}'));
-                    }
-
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-
-                    // 1. Convert Firestore Docs to Room Objects
-                    final allRooms = snapshot.data!.docs.map((doc) {
-                      return Room.fromFirestore(doc);
-                    }).toList();
-
-                    // 2. Extract Unique Values for Filters (Dynamic Content)
-                    final uniqueTypes =
-                        allRooms.map((r) => r.type).toSet().toList()..sort();
-                    final uniqueBuildings =
-                        allRooms.map((r) => r.building).toSet().toList()..sort();
-                    final uniqueFloors =
-                        allRooms.map((r) => r.floor).toSet().toList()..sort();
-
-                    // 3. Apply Client-Side Filtering
-                    final filteredRooms = _filterRooms(allRooms, _query);
-
-                    // 4. Group by Type
-                    final groupedRooms = _groupRoomsByType(filteredRooms);
-
-                    return Column(
-                      children: [
-                        /* SEARCH BAR & FILTER */
-                        Container(
-                          color: Colors.white,
-                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: TextField(
-                                  controller: _searchController,
-                                  onChanged: (value) {
-                                    setState(() {
-                                      _query = value.trim().toLowerCase();
-                                    });
-                                  },
-                                  decoration: InputDecoration(
-                                    hintText: 'Search...',
-                                    prefixIcon: const Icon(Icons.search),
-                                    prefixIconConstraints: const BoxConstraints(
-                                      minWidth: 40,
-                                      minHeight: 40,
-                                    ),
-                                    filled: true,
-                                    fillColor: const Color(0xFFF5F6FA),
-                                    contentPadding:
-                                        const EdgeInsets.symmetric(vertical: 0),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                      borderSide: BorderSide.none,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              GestureDetector(
-                                onTap: () => _showFilterSheet(
-                                  types: uniqueTypes,
-                                  buildings: uniqueBuildings,
-                                  floors: uniqueFloors,
-                                ),
-                                child: Container(
-                                  height: 48,
-                                  width: 48,
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFF5F6FA),
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: Icon(
-                                    Icons.tune,
-                                    color: _hasActiveFilters()
-                                        ? Theme.of(context).primaryColor
-                                        : Colors.grey.shade600,
-                                  ),
-                                ),
-                              ),
-                            ],
+          return Column(
+            children: [
+              /* SEARCH BAR & FILTER */
+              Container(
+                color: Colors.white,
+                padding: EdgeInsets.fromLTRB(16, topPadding + 12, 16, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (organizationName != null && organizationName.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8.0, left: 4),
+                        child: Text(
+                          organizationName,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Theme.of(context).primaryColor,
                           ),
                         ),
-
-                        /* ACTIVE FILTER INDICATOR */
-                        if (_hasActiveFilters())
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 4),
-                            child: Row(
-                              children: [
-                                Text(
-                                  'Filters active',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Theme.of(context).primaryColor,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const Spacer(),
-                                GestureDetector(
-                                  onTap: _clearFilters,
-                                  child: const Text(
-                                    'Clear all',
-                                    style: TextStyle(
-                                        fontSize: 12, color: Colors.grey),
-                                  ),
-                                ),
-                              ],
+                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _searchController,
+                            onChanged: (value) {
+                              if (_debounce?.isActive ?? false) _debounce!.cancel();
+                              _debounce = Timer(const Duration(milliseconds: 1000), () {
+                                setState(() {
+                                  _query = value.trim().toLowerCase();
+                                });
+                              });
+                            },
+                            decoration: InputDecoration(
+                              hintText: l10n.get('search'),
+                              prefixIcon: const Icon(Icons.search),
+                              prefixIconConstraints: const BoxConstraints(
+                                minWidth: 40,
+                                minHeight: 40,
+                              ),
+                              filled: true,
+                              fillColor: const Color(0xFFF5F6FA),
+                              contentPadding:
+                                  const EdgeInsets.symmetric(vertical: 0),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: BorderSide.none,
+                              ),
                             ),
                           ),
-
-                        /* ROOM LIST VIEW */
-                        Expanded(
-                          child: filteredRooms.isEmpty
-                              ? const Center(
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(Icons.search_off,
-                                          size: 48, color: Colors.grey),
-                                      SizedBox(height: 16),
-                                      Text("No rooms found",
-                                          style: TextStyle(color: Colors.grey)),
-                                    ],
-                                  ),
-                                )
-                              : ListView.builder(
-                                  padding:
-                                      const EdgeInsets.fromLTRB(16, 16, 16, 16),
-                                  itemCount: groupedRooms.length,
-                                  itemBuilder: (context, index) {
-                                    final entry =
-                                        groupedRooms.entries.elementAt(index);
-                                    return RoomTypeCard(
-                                      type: entry.key,
-                                      rooms: entry.value,
-                                    );
-                                  },
-                                ),
+                        ),
+                        const SizedBox(width: 10),
+                        GestureDetector(
+                          onTap: () => _showFilterSheet(
+                            types: [], 
+                            buildings: [], 
+                            floors: [],
+                          ),
+                          child: Container(
+                            height: 48,
+                            width: 48,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF5F6FA),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Icon(
+                              Icons.tune,
+                              color: _hasActiveFilters()
+                                  ? Theme.of(context).primaryColor
+                                  : Colors.grey.shade600,
+                            ),
+                          ),
                         ),
                       ],
-                    );
-                  },
-                );
-              },
+                    ),
+                  ],
+                ),
+              ),
+
+              /* ACTIVE FILTER INDICATOR */
+              if (_hasActiveFilters())
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 4),
+                  child: Row(
+                    children: [
+                      Text(
+                        l10n.get('filtersActive'),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(context).primaryColor,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const Spacer(),
+                      GestureDetector(
+                        onTap: _clearFilters,
+                        child: Text(
+                          l10n.get('clearAll'),
+                          style: const TextStyle(
+                              fontSize: 12, color: Colors.grey),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+              /* MAIN CONTENT */
+              Expanded(
+                child: _buildRoomList(context, organizationName),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildRoomList(BuildContext context, String? organizationName) {
+    final l10n = AppLocalizations.of(context);
+
+    if (organizationName == null || organizationName.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.business_outlined,
+                  size: 64, color: Colors.grey.shade300),
+              const SizedBox(height: 16),
+              Text(
+                l10n.get('noOrgSelected'),
+                style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                l10n.get('selectOrgPrompt'),
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.grey),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('rooms')
+          .where('organizationName', isEqualTo: organizationName)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        }
+
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final allRooms = snapshot.data!.docs.map((doc) {
+          return Room.fromFirestore(doc);
+        }).toList();
+
+        final filteredRooms = _filterRooms(allRooms, _query);
+        final groupedRooms = _groupRoomsByType(filteredRooms);
+
+        if (filteredRooms.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.search_off,
+                    size: 48, color: Colors.grey),
+                const SizedBox(height: 16),
+                Text(l10n.get('noRoomsFound'),
+                    style: const TextStyle(color: Colors.grey)),
+              ],
+            ),
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+          itemCount: groupedRooms.length,
+          itemBuilder: (context, index) {
+            final entry =
+                groupedRooms.entries.elementAt(index);
+            return RoomTypeCard(
+              type: entry.key,
+              rooms: entry.value,
             );
           },
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -297,7 +316,6 @@ class _RoomsPageState extends State<RoomsPage> {
 
   List<Room> _filterRooms(List<Room> rooms, String query) {
     return rooms.where((room) {
-      // 1. Text Search
       if (query.isNotEmpty) {
         final matchesSearch = room.name.toLowerCase().contains(query) ||
             room.type.toLowerCase().contains(query) ||
@@ -305,21 +323,18 @@ class _RoomsPageState extends State<RoomsPage> {
         if (!matchesSearch) return false;
       }
 
-      // 2. Availability Filter
       if (_selectedAvailability != null) {
-        final needsAvailable = _selectedAvailability == 'Available';
+        final l10n = AppLocalizations.of(context);
+        final needsAvailable = _selectedAvailability == l10n.get('available');
         if (room.isAvailable != needsAvailable) return false;
       }
 
-      // 3. Type Filter
       if (_selectedType != null && room.type != _selectedType) return false;
 
-      // 4. Building Filter
       if (_selectedBuilding != null && room.building != _selectedBuilding) {
         return false;
       }
 
-      // 5. Floor Filter
       if (_selectedFloor != null && room.floor != _selectedFloor) return false;
 
       return true;
@@ -341,6 +356,7 @@ class _RoomsPageState extends State<RoomsPage> {
     required List<String> buildings,
     required List<String> floors,
   }) {
+    final l10n = AppLocalizations.of(context);
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -364,56 +380,56 @@ class _RoomsPageState extends State<RoomsPage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
-                        'Filter Rooms',
-                        style: TextStyle(
+                      Text(
+                        l10n.get('filterRooms'),
+                        style: const TextStyle(
                             fontSize: 20, fontWeight: FontWeight.bold),
                       ),
                       TextButton(
                         onPressed: () {
                           _clearFilters();
-                          setModalState(() {}); // Update sheet UI
-                          setState(() {}); // Update parent UI
+                          setModalState(() {});
+                          setState(() {});
                         },
-                        child: const Text('Reset'),
+                        child: Text(l10n.get('reset')),
                       )
                     ],
                   ),
                   const SizedBox(height: 5),
                   _buildDropdown(
-                    label: 'Availability',
+                    label: l10n.get('availability'),
                     value: _selectedAvailability,
-                    items: ['Available', 'Occupied'],
+                    items: [l10n.get('available'), l10n.get('occupied')],
                     onChanged: (val) {
                       setModalState(() => _selectedAvailability = val);
                       setState(() {});
                     },
                   ),
                   _buildDropdown(
-                    label: 'Type',
+                    label: l10n.get('type'),
                     value: _selectedType,
                     items: types,
-                    capitalizeItems: true, // Only capitalize types (e.g. "classroom" -> "Classroom")
+                    capitalizeItems: true,
                     onChanged: (val) {
                       setModalState(() => _selectedType = val);
                       setState(() {});
                     },
                   ),
                   _buildDropdown(
-                    label: 'Building',
+                    label: l10n.get('building'),
                     value: _selectedBuilding,
                     items: buildings,
-                    capitalizeItems: false, // Keep original casing (e.g. "PTC Building")
+                    capitalizeItems: false,
                     onChanged: (val) {
                       setModalState(() => _selectedBuilding = val);
                       setState(() {});
                     },
                   ),
                   _buildDropdown(
-                    label: 'Floor',
+                    label: l10n.get('floor'),
                     value: _selectedFloor,
                     items: floors,
-                    capitalizeItems: false, // Keep original casing (e.g. "1st Floor")
+                    capitalizeItems: false,
                     onChanged: (val) {
                       setModalState(() => _selectedFloor = val);
                       setState(() {});
@@ -431,9 +447,9 @@ class _RoomsPageState extends State<RoomsPage> {
                         ),
                       ),
                       onPressed: () => Navigator.pop(context),
-                      child: const Text(
-                        'Done',
-                        style: TextStyle(
+                      child: Text(
+                        l10n.get('done'),
+                        style: const TextStyle(
                           fontSize: 16,
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
@@ -585,8 +601,9 @@ class _RoomRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final borderColor = Colors.grey.shade400;
+    final l10n = AppLocalizations.of(context);
     final availabilityColor = room.isAvailable ? Colors.green : Colors.red;
-    final availabilityLabel = room.isAvailable ? 'Available' : 'Occupied';
+    final availabilityLabel = room.isAvailable ? l10n.get('available') : l10n.get('occupied');
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,

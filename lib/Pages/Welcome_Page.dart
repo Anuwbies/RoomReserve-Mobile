@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:roomreserve/Pages/Login_Page.dart';
 import 'Register_Page.dart';
+import '../l10n/app_localizations.dart';
 
 class WelcomePage extends StatelessWidget {
   const WelcomePage({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return Scaffold(
       resizeToAvoidBottomInset: false,
       backgroundColor: Colors.white,
@@ -87,9 +90,9 @@ class WelcomePage extends StatelessWidget {
                             borderRadius: BorderRadius.circular(8),
                           ),
                         ),
-                        child: const Text(
-                          'Login',
-                          style: TextStyle(
+                        child: Text(
+                          l10n.get('login'),
+                          style: const TextStyle(
                               color: Colors.white,
                               fontSize: 16),
                         ),
@@ -117,9 +120,9 @@ class WelcomePage extends StatelessWidget {
                             borderRadius: BorderRadius.circular(8),
                           ),
                         ),
-                        child: const Text(
-                          'Register',
-                          style: TextStyle(
+                        child: Text(
+                          l10n.get('register'),
+                          style: const TextStyle(
                               color: Colors.black,
                               fontSize: 16),
                         ),

@@ -3,7 +3,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:provider/provider.dart';
 import 'package:roomreserve/Pages/Welcome_Page.dart';
+import '../l10n/app_localizations.dart';
+import '../providers/locale_provider.dart';
 
 // Assuming these pages exist based on your provided code
 import 'About_Page.dart';
@@ -46,18 +49,18 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _showLogoutConfirmation(BuildContext context) async {
+    final l10n = AppLocalizations.of(context);
     final bool? confirm = await showDialog<bool>(
       context: context,
       builder: (context) {
         return AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text('Log out'),
-          content:
-          const Text('Are you sure you want to log out of your account?'),
+          title: Text(l10n.get('logoutConfirmationTitle')),
+          content: Text(l10n.get('logoutConfirmationMessage')),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+              child: Text(l10n.get('cancel'), style: const TextStyle(color: Colors.grey)),
             ),
             ElevatedButton(
               onPressed: () => Navigator.of(context).pop(true),
@@ -68,7 +71,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
-              child: const Text('Logout'),
+              child: Text(l10n.get('logOut')),
             ),
           ],
         );
@@ -80,7 +83,38 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
+  void _showLanguageSelector(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                AppLocalizations.of(context).get('language'),
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 10),
+              const Divider(),
+              _LanguageItem(locale: const Locale('en'), name: 'English'),
+              _LanguageItem(locale: const Locale('ja'), name: 'Japanese'),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _selectOrganization(User user) async {
+    final l10n = AppLocalizations.of(context);
     await showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -92,9 +126,9 @@ class _ProfilePageState extends State<ProfilePage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                'Select Organization',
-                style: TextStyle(
+              Text(
+                l10n.get('selectOrganization'),
+                style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                   color: _kDangerColor, // Reddish Title
@@ -128,9 +162,9 @@ class _ProfilePageState extends State<ProfilePage> {
                           children: [
                             Icon(Icons.business_outlined, size: 48, color: Colors.red.shade200),
                             const SizedBox(height: 10),
-                            const Text(
-                              "No organizations found.",
-                              style: TextStyle(color: Colors.grey),
+                            Text(
+                              l10n.get('noRoomsFound'), // Reusing noRoomsFound or similar logic
+                              style: const TextStyle(color: Colors.grey),
                             ),
                           ],
                         ),
@@ -200,6 +234,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final User? user = FirebaseAuth.instance.currentUser;
     final String? photoUrl = user?.photoURL;
     final String displayName = user?.displayName ?? 'Guest User';
@@ -215,9 +250,9 @@ class _ProfilePageState extends State<ProfilePage> {
       appBar: AppBar(
         backgroundColor: _kBackgroundColor,
         elevation: 0,
-        title: const Text(
-          'My Profile',
-          style: TextStyle(
+        title: Text(
+          l10n.get('myProfile'),
+          style: const TextStyle(
             color: Colors.black87,
             fontWeight: FontWeight.bold,
             fontSize: 22,
@@ -262,20 +297,20 @@ class _ProfilePageState extends State<ProfilePage> {
 
                 // 2. Menu Section: General
                 _ProfileSection(
-                  title: "General",
+                  title: l10n.get('general'),
                   children: [
                     _ProfileMenuItem(
                       icon: Icons.notifications_none_rounded,
                       iconColor: Colors.orange,
-                      title: 'Notifications',
+                      title: l10n.get('notifications'),
                       onTap: () {},
                     ),
                     _ProfileMenuItem(
                       icon: Icons.language_rounded,
                       iconColor: Colors.purple,
-                      title: 'Language',
-                      trailingText: 'English',
-                      onTap: () {},
+                      title: l10n.get('language'),
+                      trailingText: _getLanguageName(Localizations.localeOf(context).languageCode),
+                      onTap: () => _showLanguageSelector(context),
                       isLast: true,
                     ),
                   ],
@@ -285,12 +320,12 @@ class _ProfilePageState extends State<ProfilePage> {
 
                 // 3. Menu Section: Support & Legal
                 _ProfileSection(
-                  title: "Support & Legal",
+                  title: l10n.get('supportLegal'),
                   children: [
                     _ProfileMenuItem(
                       icon: Icons.description_outlined,
                       iconColor: Colors.blue,
-                      title: 'Terms of Use',
+                      title: l10n.get('termsOfUse'),
                       onTap: () => Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -300,7 +335,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     _ProfileMenuItem(
                       icon: Icons.lock_outline_rounded,
                       iconColor: Colors.teal,
-                      title: 'Privacy Policy',
+                      title: l10n.get('privacyPolicy'),
                       onTap: () => Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -310,7 +345,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     _ProfileMenuItem(
                       icon: Icons.help_outline_rounded,
                       iconColor: Colors.indigo,
-                      title: 'FAQ',
+                      title: l10n.get('faq'),
                       onTap: () => Navigator.push(
                         context,
                         MaterialPageRoute(builder: (_) => const FaqPage()),
@@ -319,7 +354,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     _ProfileMenuItem(
                       icon: Icons.info_outline_rounded,
                       iconColor: Colors.grey.shade700,
-                      title: 'About App',
+                      title: l10n.get('aboutApp'),
                       onTap: () => Navigator.push(
                         context,
                         MaterialPageRoute(builder: (_) => const AboutPage()),
@@ -346,9 +381,9 @@ class _ProfilePageState extends State<ProfilePage> {
                           side: BorderSide(color: Colors.grey.shade300),
                         ),
                       ),
-                      child: const Text(
-                        'Log Out',
-                        style: TextStyle(
+                      child: Text(
+                        l10n.get('logOut'),
+                        style: const TextStyle(
                           color: _kDangerColor,
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
@@ -366,9 +401,39 @@ class _ProfilePageState extends State<ProfilePage> {
       ),
     );
   }
+
+  String _getLanguageName(String code) {
+    switch (code) {
+      case 'fil': return 'Filipino';
+      case 'ja': return 'Japanese';
+      case 'ko': return 'Korean';
+      default: return 'English';
+    }
+  }
 }
 
 // ---------------- CUSTOM WIDGETS ----------------
+
+class _LanguageItem extends StatelessWidget {
+  final Locale locale;
+  final String name;
+
+  const _LanguageItem({required this.locale, required this.name});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      title: Text(name),
+      onTap: () {
+        context.read<LocaleProvider>().setLocale(locale);
+        Navigator.pop(context);
+      },
+      trailing: Localizations.localeOf(context).languageCode == locale.languageCode
+          ? const Icon(Icons.check, color: Colors.blue)
+          : null,
+    );
+  }
+}
 
 class _ProfileHeader extends StatelessWidget {
   final String? photoUrl;
@@ -388,6 +453,7 @@ class _ProfileHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool hasOrg = organizationName.isNotEmpty;
+    final l10n = AppLocalizations.of(context);
 
     return Column(
       children: [
@@ -487,7 +553,7 @@ class _ProfileHeader extends StatelessWidget {
                   const SizedBox(width: 6),
                 ],
                 Text(
-                  hasOrg ? organizationName : "Select Organization",
+                  hasOrg ? organizationName : l10n.get('selectOrganization'),
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,

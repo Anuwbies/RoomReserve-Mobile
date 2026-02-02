@@ -5,6 +5,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 
 import 'NavigationBar_Page.dart';
 import 'Register_Page.dart';
+import '../l10n/app_localizations.dart';
 
 enum LoginMethod { none, email, google }
 
@@ -58,11 +59,12 @@ class _LoginPageState extends State<LoginPage> {
 
   // ---------------- EMAIL/PASSWORD LOGIN ----------------
   Future<void> _loginWithEmail() async {
+    final l10n = AppLocalizations.of(context);
     final email = _emailController.text.trim();
     final password = _passwordController.text;
 
     if (email.isEmpty || password.isEmpty) {
-      _showError('All fields are required');
+      _showError(l10n.get('allFieldsRequired'));
       return;
     }
 
@@ -90,16 +92,17 @@ class _LoginPageState extends State<LoginPage> {
       );
 
     } on FirebaseAuthException catch (e) {
-      _showError(e.message ?? 'Login failed');
+      _showError(e.message ?? l10n.get('loginFailed'));
       if (mounted) setState(() => _loadingMethod = LoginMethod.none);
     } catch (_) {
-      _showError('Something went wrong. Please try again.');
+      _showError(l10n.get('somethingWentWrong'));
       if (mounted) setState(() => _loadingMethod = LoginMethod.none);
     }
   }
 
   // ---------------- GOOGLE SIGN-IN ----------------
   Future<void> _signInWithGoogle() async {
+    final l10n = AppLocalizations.of(context);
     setState(() => _loadingMethod = LoginMethod.google);
 
     try {
@@ -140,7 +143,7 @@ class _LoginPageState extends State<LoginPage> {
       );
 
     } catch (_) {
-      _showError('Google sign-in failed. Please try again.');
+      _showError(l10n.get('googleSignInFailed'));
       if (mounted) setState(() => _loadingMethod = LoginMethod.none);
     }
   }
@@ -196,6 +199,8 @@ class _LoginPageState extends State<LoginPage> {
   // ---------------- UI ----------------
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return Scaffold(
       resizeToAvoidBottomInset: false,
       backgroundColor: Colors.white,
@@ -225,9 +230,9 @@ class _LoginPageState extends State<LoginPage> {
                     children: [
                       const SizedBox(height: 16),
 
-                      const Text(
-                        'Welcome back! Glad to see you again',
-                        style: TextStyle(
+                      Text(
+                        l10n.get('welcomeBack'),
+                        style: const TextStyle(
                           fontSize: 26,
                           fontWeight: FontWeight.w700,
                         ),
@@ -237,7 +242,7 @@ class _LoginPageState extends State<LoginPage> {
 
                       TextField(
                         controller: _emailController,
-                        decoration: _inputDecoration('Email'),
+                        decoration: _inputDecoration(l10n.get('email')),
                         keyboardType: TextInputType.emailAddress,
                       ),
 
@@ -247,7 +252,7 @@ class _LoginPageState extends State<LoginPage> {
                         controller: _passwordController,
                         obscureText: _obscurePassword,
                         decoration: _inputDecoration(
-                          'Password',
+                          l10n.get('password'),
                           suffixIcon: GestureDetector(
                             onTap: () {
                               setState(() {
@@ -292,9 +297,9 @@ class _LoginPageState extends State<LoginPage> {
                               color: Colors.white,
                             ),
                           )
-                              : const Text(
-                            'Login',
-                            style: TextStyle(
+                              : Text(
+                            l10n.get('login'),
+                            style: const TextStyle(
                               color: Colors.white,
                               fontSize: 16,
                             ),
@@ -305,16 +310,16 @@ class _LoginPageState extends State<LoginPage> {
                       const SizedBox(height: 24),
 
                       Row(
-                        children: const [
-                          Expanded(child: Divider()),
+                        children: [
+                          const Expanded(child: Divider()),
                           Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 12),
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
                             child: Text(
-                              'Or Login with',
-                              style: TextStyle(color: Colors.grey),
+                              l10n.get('orLoginWith'),
+                              style: const TextStyle(color: Colors.grey),
                             ),
                           ),
-                          Expanded(child: Divider()),
+                          const Expanded(child: Divider()),
                         ],
                       ),
 
@@ -353,9 +358,9 @@ class _LoginPageState extends State<LoginPage> {
                                 const Icon(Icons.g_mobiledata, size: 30),
                               ),
                               const SizedBox(width: 10),
-                              const Text(
-                                'Google',
-                                style: TextStyle(
+                              Text(
+                                l10n.get('google'),
+                                style: const TextStyle(
                                   color: Colors.black,
                                   fontSize: 16,
                                 ),
@@ -376,7 +381,7 @@ class _LoginPageState extends State<LoginPage> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text('Don’t have an account? '),
+                      Text(l10n.get('dontHaveAccount')),
                       GestureDetector(
                         onTap: () {
                           Navigator.pushReplacement(
@@ -386,9 +391,9 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                           );
                         },
-                        child: const Text(
-                          'Register Now',
-                          style: TextStyle(
+                        child: Text(
+                          l10n.get('registerNow'),
+                          style: const TextStyle(
                             color: Colors.blue,
                             fontWeight: FontWeight.w600,
                           ),
