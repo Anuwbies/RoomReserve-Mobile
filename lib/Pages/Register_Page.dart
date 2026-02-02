@@ -67,7 +67,7 @@ class _RegisterPageState extends State<RegisterPage> {
           'name': fullName,
           'email': user.email,
           'role': 'student', // Default role
-          'organization': '', // Default organization is blank
+          'organizationName': '', // Default organization is blank
           'isActive': true,
           'isEmailVerified': user.emailVerified,
           'createdAt': FieldValue.serverTimestamp(),

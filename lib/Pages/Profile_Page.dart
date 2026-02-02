@@ -166,7 +166,7 @@ class _ProfilePageState extends State<ProfilePage> {
                             if (docSnapshot.exists) {
                               // Just update organization and timestamp
                               await userDoc.update({
-                                'organization': orgName,
+                                'organizationName': orgName,
                                 'updatedAt': FieldValue.serverTimestamp(),
                               });
                             } else {
@@ -175,7 +175,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                 'name': user.displayName ?? 'Guest',
                                 'email': user.email,
                                 'role': 'student',
-                                'organization': orgName,
+                                'organizationName': orgName,
                                 'isActive': true,
                                 'isEmailVerified': user.emailVerified,
                                 'createdAt': FieldValue.serverTimestamp(),
@@ -241,7 +241,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
           // Get Data from Firestore
           final userData = snapshot.data?.data() as Map<String, dynamic>?;
-          final String organization = userData?['organization'] ?? '';
+          final String organizationName = userData?['organizationName'] ?? '';
 
           return SingleChildScrollView(
             physics: const BouncingScrollPhysics(),
@@ -254,7 +254,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   photoUrl: photoUrl,
                   displayName: displayName,
                   email: email,
-                  organization: organization,
+                  organizationName: organizationName,
                   onSelectOrganization: () => _selectOrganization(user),
                 ),
 
@@ -374,20 +374,20 @@ class _ProfileHeader extends StatelessWidget {
   final String? photoUrl;
   final String displayName;
   final String email;
-  final String organization;
+  final String organizationName;
   final VoidCallback onSelectOrganization;
 
   const _ProfileHeader({
     required this.photoUrl,
     required this.displayName,
     required this.email,
-    required this.organization,
+    required this.organizationName,
     required this.onSelectOrganization,
   });
 
   @override
   Widget build(BuildContext context) {
-    final bool hasOrg = organization.isNotEmpty;
+    final bool hasOrg = organizationName.isNotEmpty;
 
     return Column(
       children: [
@@ -487,7 +487,7 @@ class _ProfileHeader extends StatelessWidget {
                   const SizedBox(width: 6),
                 ],
                 Text(
-                  hasOrg ? organization : "Select Organization",
+                  hasOrg ? organizationName : "Select Organization",
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,

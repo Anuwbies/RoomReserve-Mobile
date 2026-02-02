@@ -44,7 +44,7 @@ class _LoginPageState extends State<LoginPage> {
           'name': user.displayName ?? 'Unknown User',
           'email': user.email,
           'role': 'student',      // Default role
-          'organization': '',     // Default organization
+          'organizationName': '',     // Default organization
           'isActive': true,       // Added to match RegisterPage
           'isEmailVerified': user.emailVerified, // Added to match RegisterPage
           'createdAt': FieldValue.serverTimestamp(),

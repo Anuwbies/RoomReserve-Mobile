@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'RoomDetails_Page.dart'; // Import Details Page
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -51,153 +52,224 @@ class _RoomsPageState extends State<RoomsPage> {
 
   @override
   Widget build(BuildContext context) {
-    // PRODUCTION: Use `FirebaseFirestore.instance.collection('rooms').snapshots();`
-    const String appId = 'default-app-id';
-    final Stream<QuerySnapshot> roomsStream = FirebaseFirestore.instance
-        .collection('rooms')
-        .snapshots();
-
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
       body: SafeArea(
-        child: StreamBuilder<QuerySnapshot>(
-          stream: roomsStream,
-          builder: (context, snapshot) {
-            if (snapshot.hasError) {
-              return Center(child: Text('Error: ${snapshot.error}'));
-            }
-
-            if (snapshot.connectionState == ConnectionState.waiting) {
+        child: StreamBuilder<User?>(
+          stream: FirebaseAuth.instance.authStateChanges(),
+          builder: (context, authSnapshot) {
+            if (authSnapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
             }
 
-            // 1. Convert Firestore Docs to Room Objects
-            final allRooms = snapshot.data!.docs.map((doc) {
-              return Room.fromFirestore(doc);
-            }).toList();
+            final user = authSnapshot.data;
+            if (user == null) {
+              return const Center(child: CircularProgressIndicator());
+            }
 
-            // 2. Extract Unique Values for Filters (Dynamic Content)
-            final uniqueTypes = allRooms.map((r) => r.type).toSet().toList()..sort();
-            final uniqueBuildings = allRooms.map((r) => r.building).toSet().toList()..sort();
-            final uniqueFloors = allRooms.map((r) => r.floor).toSet().toList()..sort();
+            return StreamBuilder<DocumentSnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(user.uid)
+                  .snapshots(),
+              builder: (context, userDocSnapshot) {
+                if (userDocSnapshot.hasError) {
+                  return Center(
+                      child: Text('Error loading profile: ${userDocSnapshot.error}'));
+                }
 
-            // 3. Apply Client-Side Filtering
-            final filteredRooms = _filterRooms(allRooms, _query);
+                if (userDocSnapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
 
-            // 4. Group by Type
-            final groupedRooms = _groupRoomsByType(filteredRooms);
+                final userData =
+                    userDocSnapshot.data?.data() as Map<String, dynamic>?;
+                final organizationName = userData?['organizationName'] as String?;
 
-            return Column(
-              children: [
-                /* SEARCH BAR & FILTER */
-                Container(
-                  color: Colors.white,
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _searchController,
-                          onChanged: (value) {
-                            setState(() {
-                              _query = value.trim().toLowerCase();
-                            });
-                          },
-                          decoration: InputDecoration(
-                            hintText: 'Search...',
-                            prefixIcon: const Icon(Icons.search),
-                            prefixIconConstraints: const BoxConstraints(
-                              minWidth: 40,
-                              minHeight: 40,
-                            ),
-                            filled: true,
-                            fillColor: const Color(0xFFF5F6FA),
-                            contentPadding: const EdgeInsets.symmetric(vertical: 0),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: BorderSide.none,
-                            ),
+                if (organizationName == null || organizationName.isEmpty) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(32.0),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.business_outlined,
+                              size: 64, color: Colors.grey.shade300),
+                          const SizedBox(height: 16),
+                          const Text(
+                            "No Organization Selected",
+                            style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.grey),
                           ),
-                        ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            "Please go to your Profile to select an organization and view available rooms.",
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 10),
-                      GestureDetector(
-                        onTap: () => _showFilterSheet(
-                          types: uniqueTypes,
-                          buildings: uniqueBuildings,
-                          floors: uniqueFloors,
-                        ),
-                        child: Container(
-                          height: 48,
-                          width: 48,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF5F6FA),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Icon(
-                            Icons.tune,
-                            color: _hasActiveFilters()
-                                ? Theme.of(context).primaryColor
-                                : Colors.grey.shade600,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                    ),
+                  );
+                }
 
-                /* ACTIVE FILTER INDICATOR */
-                if (_hasActiveFilters())
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                    child: Row(
+                return StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('rooms')
+                      .where('organizationName', isEqualTo: organizationName)
+                      .snapshots(),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasError) {
+                      return Center(child: Text('Error: ${snapshot.error}'));
+                    }
+
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    // 1. Convert Firestore Docs to Room Objects
+                    final allRooms = snapshot.data!.docs.map((doc) {
+                      return Room.fromFirestore(doc);
+                    }).toList();
+
+                    // 2. Extract Unique Values for Filters (Dynamic Content)
+                    final uniqueTypes =
+                        allRooms.map((r) => r.type).toSet().toList()..sort();
+                    final uniqueBuildings =
+                        allRooms.map((r) => r.building).toSet().toList()..sort();
+                    final uniqueFloors =
+                        allRooms.map((r) => r.floor).toSet().toList()..sort();
+
+                    // 3. Apply Client-Side Filtering
+                    final filteredRooms = _filterRooms(allRooms, _query);
+
+                    // 4. Group by Type
+                    final groupedRooms = _groupRoomsByType(filteredRooms);
+
+                    return Column(
                       children: [
-                        Text(
-                          'Filters active',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Theme.of(context).primaryColor,
-                            fontWeight: FontWeight.bold,
+                        /* SEARCH BAR & FILTER */
+                        Container(
+                          color: Colors.white,
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: _searchController,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _query = value.trim().toLowerCase();
+                                    });
+                                  },
+                                  decoration: InputDecoration(
+                                    hintText: 'Search...',
+                                    prefixIcon: const Icon(Icons.search),
+                                    prefixIconConstraints: const BoxConstraints(
+                                      minWidth: 40,
+                                      minHeight: 40,
+                                    ),
+                                    filled: true,
+                                    fillColor: const Color(0xFFF5F6FA),
+                                    contentPadding:
+                                        const EdgeInsets.symmetric(vertical: 0),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                      borderSide: BorderSide.none,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              GestureDetector(
+                                onTap: () => _showFilterSheet(
+                                  types: uniqueTypes,
+                                  buildings: uniqueBuildings,
+                                  floors: uniqueFloors,
+                                ),
+                                child: Container(
+                                  height: 48,
+                                  width: 48,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF5F6FA),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Icon(
+                                    Icons.tune,
+                                    color: _hasActiveFilters()
+                                        ? Theme.of(context).primaryColor
+                                        : Colors.grey.shade600,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        const Spacer(),
-                        GestureDetector(
-                          onTap: _clearFilters,
-                          child: const Text(
-                            'Clear all',
-                            style: TextStyle(fontSize: 12, color: Colors.grey),
+
+                        /* ACTIVE FILTER INDICATOR */
+                        if (_hasActiveFilters())
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 4),
+                            child: Row(
+                              children: [
+                                Text(
+                                  'Filters active',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Theme.of(context).primaryColor,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const Spacer(),
+                                GestureDetector(
+                                  onTap: _clearFilters,
+                                  child: const Text(
+                                    'Clear all',
+                                    style: TextStyle(
+                                        fontSize: 12, color: Colors.grey),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
+
+                        /* ROOM LIST VIEW */
+                        Expanded(
+                          child: filteredRooms.isEmpty
+                              ? const Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.search_off,
+                                          size: 48, color: Colors.grey),
+                                      SizedBox(height: 16),
+                                      Text("No rooms found",
+                                          style: TextStyle(color: Colors.grey)),
+                                    ],
+                                  ),
+                                )
+                              : ListView.builder(
+                                  padding:
+                                      const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                                  itemCount: groupedRooms.length,
+                                  itemBuilder: (context, index) {
+                                    final entry =
+                                        groupedRooms.entries.elementAt(index);
+                                    return RoomTypeCard(
+                                      type: entry.key,
+                                      rooms: entry.value,
+                                    );
+                                  },
+                                ),
                         ),
                       ],
-                    ),
-                  ),
-
-                /* ROOM LIST VIEW */
-                Expanded(
-                  child: filteredRooms.isEmpty
-                      ? const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.search_off, size: 48, color: Colors.grey),
-                        SizedBox(height: 16),
-                        Text("No rooms found", style: TextStyle(color: Colors.grey)),
-                      ],
-                    ),
-                  )
-                      : ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-                    itemCount: groupedRooms.length,
-                    itemBuilder: (context, index) {
-                      final entry = groupedRooms.entries.elementAt(index);
-                      return RoomTypeCard(
-                        type: entry.key,
-                        rooms: entry.value,
-                      );
-                    },
-                  ),
-                ),
-              ],
+                    );
+                  },
+                );
+              },
             );
           },
         ),
@@ -472,11 +544,22 @@ class RoomTypeCard extends StatelessWidget {
               children: List.generate(rooms.length, (index) {
                 final isLast = index == rooms.length - 1;
 
-                return Padding(
-                  padding: EdgeInsets.only(bottom: isLast ? 0 : 10),
-                  child: _RoomRow(
-                    room: rooms[index],
-                    colorScheme: colorScheme,
+                return GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => RoomDetailsPage(room: rooms[index]),
+                      ),
+                    );
+                  },
+                  behavior: HitTestBehavior.opaque, // Ensures the entire row is clickable
+                  child: Padding(
+                    padding: EdgeInsets.only(bottom: isLast ? 0 : 10),
+                    child: _RoomRow(
+                      room: rooms[index],
+                      colorScheme: colorScheme,
+                    ),
                   ),
                 );
               }),
@@ -652,6 +735,10 @@ class Room {
   final String floor;
   final bool isAvailable;
   final List<RoomTag> tags;
+  final String description;
+  final int capacity;
+  final Map<String, dynamic> bookingRules;
+  final Map<String, dynamic> availability;
 
   Room({
     required this.id,
@@ -661,6 +748,10 @@ class Room {
     required this.floor,
     required this.isAvailable,
     required this.tags,
+    required this.description,
+    required this.capacity,
+    required this.bookingRules,
+    required this.availability,
   });
 
   factory Room.fromFirestore(DocumentSnapshot doc) {
@@ -696,6 +787,10 @@ class Room {
       floor: floor,
       isAvailable: isAvailable,
       tags: parsedTags,
+      description: data['description'] ?? '',
+      capacity: data['capacity'] ?? 0,
+      bookingRules: data['bookingRules'] as Map<String, dynamic>? ?? {},
+      availability: data['availability'] as Map<String, dynamic>? ?? {},
     );
   }
 }
