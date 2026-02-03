@@ -283,7 +283,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           leading: Container(
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: _kDangerColor.withOpacity(0.1),
+                              color: _kDangerColor.withValues(alpha: 0.1),
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(Icons.school_rounded, color: _kDangerColor, size: 20),
@@ -639,8 +639,8 @@ class _ProfileHeader extends StatelessWidget {
 
     String statusText = "";
     Color statusColor = _kPrimaryColor;
-    Color bgColor = _kPrimaryColor.withOpacity(0.08);
-    Color borderColor = _kPrimaryColor.withOpacity(0.1);
+    Color bgColor = _kPrimaryColor.withValues(alpha: 0.08);
+    Color borderColor = _kPrimaryColor.withValues(alpha: 0.1);
 
     if (hasOrg) {
       if (isPending) {
@@ -652,17 +652,17 @@ class _ProfileHeader extends StatelessWidget {
         statusText = l10n.get('kicked');
         statusColor = _kDangerColor;
         bgColor = Colors.red.shade50;
-        borderColor = _kDangerColor.withOpacity(0.3);
+        borderColor = _kDangerColor.withValues(alpha: 0.3);
       } else if (isDeclined) {
         statusText = l10n.get('declined');
         statusColor = _kDangerColor;
         bgColor = Colors.red.shade50;
-        borderColor = _kDangerColor.withOpacity(0.3);
+        borderColor = _kDangerColor.withValues(alpha: 0.3);
       }
     } else {
       statusColor = _kDangerColor;
       bgColor = Colors.red.shade50;
-      borderColor = _kDangerColor.withOpacity(0.3);
+      borderColor = _kDangerColor.withValues(alpha: 0.3);
     }
 
     return Column(
@@ -675,7 +675,7 @@ class _ProfileHeader extends StatelessWidget {
                 border: Border.all(color: Colors.white, width: 4),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
+                    color: Colors.black.withValues(alpha: 0.1),
                     blurRadius: 10,
                     offset: const Offset(0, 5),
                   ),
@@ -740,40 +740,65 @@ class _ProfileHeader extends StatelessWidget {
         const SizedBox(height: 12),
 
         // Organization Pill
-        GestureDetector(
-          onTap: hasOrg ? onLeaveOrCancel : onSelectOrganization,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            decoration: BoxDecoration(
-              color: bgColor,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: borderColor),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (!hasOrg) ...[
-                  const Icon(Icons.add_business_rounded, size: 16, color: _kDangerColor),
-                  const SizedBox(width: 6),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: GestureDetector(
+            onTap: hasOrg ? onLeaveOrCancel : onSelectOrganization,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              decoration: BoxDecoration(
+                color: bgColor,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: borderColor),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (!hasOrg) ...[
+                    const Icon(Icons.add_business_rounded, size: 16, color: _kDangerColor),
+                    const SizedBox(width: 6),
+                  ],
+                  if (hasOrg) ...[
+                    Flexible(
+                      child: Text(
+                        organizationName!,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: statusColor,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                    ),
+                    Text(
+                      statusText,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: statusColor,
+                      ),
+                    ),
+                  ] else
+                    Text(
+                      l10n.get('selectOrganization'),
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: statusColor,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  if (hasOrg) ...[
+                    const SizedBox(width: 6),
+                    Icon(
+                      isPending ? Icons.close_rounded : (isKicked || isDeclined ? Icons.delete_outline : Icons.logout_rounded),
+                      size: 16,
+                      color: statusColor,
+                    ),
+                  ],
                 ],
-                Text(
-                  hasOrg ? "$organizationName$statusText" : l10n.get('selectOrganization'),
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: statusColor,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                if (hasOrg) ...[
-                  const SizedBox(width: 6),
-                  Icon(
-                    isPending ? Icons.close_rounded : (isKicked || isDeclined ? Icons.delete_outline : Icons.logout_rounded),
-                    size: 16,
-                    color: statusColor,
-                  ),
-                ],
-              ],
+              ),
             ),
           ),
         ),
@@ -815,7 +840,7 @@ class _ProfileSection extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.02),
+                color: Colors.black.withValues(alpha: 0.02),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -867,7 +892,7 @@ class _ProfileMenuItem extends StatelessWidget {
                     width: 38,
                     height: 38,
                     decoration: BoxDecoration(
-                      color: iconColor.withOpacity(0.1),
+                      color: iconColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Icon(

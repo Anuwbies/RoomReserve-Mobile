@@ -51,22 +51,25 @@ class _ReservePageState extends State<ReservePage> {
     _durationMinutes = minDuration > 0 ? minDuration : 30;
   }
 
-  bool _isTimeValid(TimeOfDay time) {
+  bool _isTimeValid(TimeOfDay time, {int? durationMinutes}) {
     final startStr = widget.room.availability['startTime'] as String?;
     final endStr = widget.room.availability['endTime'] as String?;
     final minTime = _parseTime(startStr);
     final maxTime = _parseTime(endStr);
 
-    double pickedDouble = time.hour + time.minute / 60.0;
-    double? minDouble = minTime != null
-        ? minTime.hour + minTime.minute / 60.0
-        : null;
-    double? maxDouble = maxTime != null
-        ? maxTime.hour + maxTime.minute / 60.0
-        : null;
+    double startDouble = time.hour + time.minute / 60.0;
+    double? minDouble = minTime != null ? minTime.hour + minTime.minute / 60.0 : null;
+    double? maxDouble = maxTime != null ? maxTime.hour + maxTime.minute / 60.0 : null;
 
-    if (minDouble != null && pickedDouble < minDouble) return false;
-    if (maxDouble != null && pickedDouble > maxDouble) return false;
+    if (minDouble != null && startDouble < minDouble) return false;
+    
+    if (durationMinutes != null) {
+      double endDouble = startDouble + (durationMinutes / 60.0);
+      if (maxDouble != null && endDouble > maxDouble) return false;
+    } else {
+      if (maxDouble != null && startDouble >= maxDouble) return false;
+    }
+    
     return true;
   }
 
@@ -157,7 +160,7 @@ class _ReservePageState extends State<ReservePage> {
     if (picked != null) {
       setState(() {
         _startTime = picked;
-        _timeError = !_isTimeValid(picked);
+        _timeError = !_isTimeValid(picked, durationMinutes: _durationMinutes);
       });
     }
   }
@@ -165,7 +168,7 @@ class _ReservePageState extends State<ReservePage> {
   Future<void> _submitReservation() async {
     if (_formKey.currentState!.validate()) {
       final l10n = AppLocalizations.of(context);
-      if (!_isTimeValid(_startTime)) {
+      if (!_isTimeValid(_startTime, durationMinutes: _durationMinutes)) {
         final startStr = widget.room.availability['startTime'] as String? ?? 'N/A';
         final endStr = widget.room.availability['endTime'] as String? ?? 'N/A';
         ScaffoldMessenger.of(context).showSnackBar(
@@ -192,7 +195,7 @@ class _ReservePageState extends State<ReservePage> {
       final endDateTime = startDateTime.add(Duration(minutes: _durationMinutes));
 
       final bool requiresApproval = widget.room.bookingRules['requiresApproval'] == true;
-      final String status = requiresApproval ? 'Pending' : 'Approved';
+      final String status = requiresApproval ? 'pending' : 'approved';
 
       String userName = 'Unknown';
       String organization = 'None';
@@ -434,12 +437,12 @@ class _ReservePageState extends State<ReservePage> {
                                 child: Text(_formatDuration(value)),
                               );
                             }).toList(),
-                            onChanged: (int? newValue) {
-                              setState(() {
-                                _durationMinutes = newValue!;
-                              });
-                            },
-                            validator: (value) {
+                                                      onChanged: (int? newValue) {
+                                                        setState(() {
+                                                          _durationMinutes = newValue!;
+                                                          _timeError = !_isTimeValid(_startTime, durationMinutes: _durationMinutes);
+                                                        });
+                                                      },                            validator: (value) {
                               final min = widget.room.bookingRules['minDurationMinutes'] as int? ?? 0;
                               final max = widget.room.bookingRules['maxDurationMinutes'] as int? ?? 1440;
                               if (value! < min && min > 0) return 'Min: ${_formatDuration(min)}';
@@ -504,7 +507,7 @@ class _ReservePageState extends State<ReservePage> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: colorScheme.primary,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
