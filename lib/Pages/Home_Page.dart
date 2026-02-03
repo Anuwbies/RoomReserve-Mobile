@@ -42,7 +42,7 @@ class HomePage extends StatelessWidget {
       backgroundColor: const Color(0xFFF8F9FD), // Slightly cleaner grey
       body: SafeArea(
         child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
+          physics: const ClampingScrollPhysics(),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
             child: Column(

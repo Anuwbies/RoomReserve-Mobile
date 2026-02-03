@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:ntp/ntp.dart';
 import 'package:intl/intl.dart';
 import 'Rooms_Page.dart'; // Import to access the Room and RoomTag classes
+import 'Reserve_Page.dart';
 import '../l10n/app_localizations.dart';
 
 class RoomDetailsPage extends StatefulWidget {
@@ -41,12 +42,12 @@ class _RoomDetailsPageState extends State<RoomDetailsPage> {
   }
 
   String _formatDuration(int minutes, AppLocalizations l10n) {
-    if (minutes == 0) return "0 ${l10n.get('mins')}";
-    if (minutes >= 60 && minutes % 60 == 0) {
-      int hours = minutes ~/ 60;
-      return "$hours ${hours == 1 ? l10n.get('hour') : l10n.get('hours')}";
-    }
-    return "$minutes ${l10n.get('mins')}";
+    if (minutes < 60) return "$minutes mins";
+    int hours = minutes ~/ 60;
+    int remainingMinutes = minutes % 60;
+    String hoursText = hours == 1 ? "1hr" : "${hours}hrs";
+    if (remainingMinutes == 0) return hoursText;
+    return "$hoursText • ${remainingMinutes}mins";
   }
 
   String _getDayName(int day, BuildContext context) {
@@ -285,7 +286,7 @@ class _RoomDetailsPageState extends State<RoomDetailsPage> {
                               TextSpan(
                                 text: _isDescriptionExpanded ? " ${l10n.get('seeLess')}" : " ${l10n.get('seeMore')}",
                                 style: TextStyle(
-                                  fontSize: 14,
+                                  fontSize: 12,
                                   color: colorScheme.primary,
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -529,11 +530,11 @@ class _RoomDetailsPageState extends State<RoomDetailsPage> {
                 child: ElevatedButton(
                   onPressed: isAvailable
                       ? () {
-                          // TODO: Navigate to Reservation Page
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                                content: Text(
-                                    "Reservation feature coming soon!")),
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ReservePage(room: room),
+                            ),
                           );
                         }
                       : null, // Disable if not available

@@ -107,10 +107,10 @@ class _RoomsPageState extends State<RoomsPage> {
                         padding: const EdgeInsets.only(bottom: 8.0, left: 4),
                         child: Text(
                           organizationName,
-                          style: TextStyle(
-                            fontSize: 14,
+                          style: const TextStyle(
+                            fontSize: 20,
                             fontWeight: FontWeight.bold,
-                            color: Theme.of(context).primaryColor,
+                            color: Colors.black,
                           ),
                         ),
                       ),
