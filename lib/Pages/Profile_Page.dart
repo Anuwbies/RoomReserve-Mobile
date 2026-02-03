@@ -141,26 +141,27 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<void> _confirmLeaveOrCancel(BuildContext context, String? membershipId, String? status) async {
     if (membershipId == null) return;
     
+    final l10n = AppLocalizations.of(context);
     final isPending = status == 'pending';
     final isKicked = status == 'kicked';
     final isDeclined = status == 'declined';
     
-    String title = 'Leave Organization?';
-    String message = 'Are you sure you want to leave this organization?';
-    String actionLabel = 'Leave';
+    String title = l10n.get('leaveOrgTitle');
+    String message = l10n.get('leaveOrgMessage');
+    String actionLabel = l10n.get('leaveOrgAction');
 
     if (isPending) {
-      title = 'Cancel Request?';
-      message = 'Are you sure you want to cancel your membership request?';
-      actionLabel = 'Cancel Request';
+      title = l10n.get('cancelRequestTitle');
+      message = l10n.get('cancelRequestMessage');
+      actionLabel = l10n.get('cancelRequestAction');
     } else if (isKicked) {
-      title = 'Dismiss Notification?';
-      message = 'You have been removed from this organization. Dismiss this notice?';
-      actionLabel = 'Dismiss';
+      title = l10n.get('dismissNoticeTitle');
+      message = l10n.get('kickedNoticeMessage');
+      actionLabel = l10n.get('dismissAction');
     } else if (isDeclined) {
-      title = 'Dismiss Notification?';
-      message = 'Your membership request was declined. Dismiss this notice?';
-      actionLabel = 'Dismiss';
+      title = l10n.get('dismissNoticeTitle');
+      message = l10n.get('declinedNoticeMessage');
+      actionLabel = l10n.get('dismissAction');
     }
 
     final bool? confirm = await showDialog<bool>(
@@ -173,7 +174,7 @@ class _ProfilePageState extends State<ProfilePage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('No', style: TextStyle(color: Colors.grey)),
+              child: Text(l10n.get('no'), style: const TextStyle(color: Colors.grey)),
             ),
             ElevatedButton(
               onPressed: () => Navigator.of(context).pop(true),
@@ -199,7 +200,7 @@ class _ProfilePageState extends State<ProfilePage> {
         });
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-             SnackBar(content: Text(isPending ? 'Request cancelled' : (isKicked || isDeclined ? 'Notification dismissed' : 'Left organization'))),
+             SnackBar(content: Text(isPending ? l10n.get('requestCancelled') : (isKicked || isDeclined ? l10n.get('notificationDismissed') : l10n.get('leftOrganization')))),
           );
         }
       } catch (e) {
@@ -337,7 +338,7 @@ class _ProfilePageState extends State<ProfilePage> {
                               if (mounted) {
                                 Navigator.pop(context);
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Membership request sent. Status: Pending')),
+                                  SnackBar(content: Text(l10n.get('membershipRequestSent'))),
                                 );
                               }
                             } catch (e) {
@@ -643,17 +644,17 @@ class _ProfileHeader extends StatelessWidget {
 
     if (hasOrg) {
       if (isPending) {
-        statusText = " (Pending)";
+        statusText = l10n.get('pending');
         statusColor = Colors.orange.shade800;
         bgColor = Colors.orange.shade50;
         borderColor = Colors.orange.shade200;
       } else if (isKicked) {
-        statusText = " (Kicked)";
+        statusText = l10n.get('kicked');
         statusColor = _kDangerColor;
         bgColor = Colors.red.shade50;
         borderColor = _kDangerColor.withOpacity(0.3);
       } else if (isDeclined) {
-        statusText = " (Declined)";
+        statusText = l10n.get('declined');
         statusColor = _kDangerColor;
         bgColor = Colors.red.shade50;
         borderColor = _kDangerColor.withOpacity(0.3);

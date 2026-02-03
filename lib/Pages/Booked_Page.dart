@@ -164,7 +164,7 @@ class _BookedPageState extends State<BookedPage>
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16,16,16,0),
       itemCount: filtered.length,
       itemBuilder: (context, index) {
         return BookingCard(booking: filtered[index]);

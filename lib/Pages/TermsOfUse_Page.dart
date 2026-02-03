@@ -1,16 +1,20 @@
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
 
 class TermsOfUsePage extends StatelessWidget {
   const TermsOfUsePage({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
       body: SafeArea(
         child: Column(
           children: [
             const SizedBox(height: 16),
+
             // Header: Back button + centered title
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -20,11 +24,11 @@ class TermsOfUsePage extends StatelessWidget {
                     onPressed: () => Navigator.pop(context),
                     icon: const Icon(Icons.arrow_back_ios_new),
                   ),
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'Terms of Use',
+                      l10n.get('termsOfUse'),
                       textAlign: TextAlign.center,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w700,
                       ),
@@ -41,56 +45,31 @@ class TermsOfUsePage extends StatelessWidget {
                 const EdgeInsets.only(left: 20, right: 20, bottom: 20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    _SectionTitle('1. Acceptance of Terms'),
-                    _SectionText(
-                      'By accessing or using RoomReserve, you acknowledge that you have read, '
-                          'understood, and agree to comply with these Terms of Use. If you do not agree '
-                          'with any part of these terms, you must discontinue use of the system.',
-                    ),
+                  children: [
+                    _SectionTitle(l10n.get('tou_sec1_title')),
+                    _SectionText(l10n.get('tou_sec1_text')),
 
-                    _SectionTitle('2. Purpose of the System'),
-                    _SectionText(
-                      'RoomReserve is intended solely for campus facility reservation and utilization '
-                          'monitoring. The system allows authorized users to request room bookings while '
-                          'administrators manage approvals, scheduling, and reporting.',
-                    ),
+                    _SectionTitle(l10n.get('tou_sec2_title')),
+                    _SectionText(l10n.get('tou_sec2_text')),
 
-                    _SectionTitle('3. User Responsibilities'),
-                    _SectionText(
-                      'Users are responsible for providing accurate reservation details and for '
-                          'using campus facilities in accordance with institutional policies. Any misuse, '
-                          'false booking, or unauthorized access may result in suspension or termination '
-                          'of system privileges.',
-                    ),
+                    _SectionTitle(l10n.get('tou_sec3_title')),
+                    _SectionText(l10n.get('tou_sec3_text')),
 
-                    _SectionTitle('4. Reservation and Approval Policy'),
-                    _SectionText(
-                      'All room reservation requests are subject to availability and administrative '
-                          'approval. RoomReserve does not guarantee approval of requests and reserves the '
-                          'right to cancel or modify bookings that violate institutional rules.',
-                    ),
+                    _SectionTitle(l10n.get('tou_sec4_title')),
+                    _SectionText(l10n.get('tou_sec4_text')),
 
-                    _SectionTitle('5. Limitation of Liability'),
-                    _SectionText(
-                      'RoomReserve is provided on an "as is" basis. The developers and administrators '
-                          'are not liable for scheduling conflicts, denied reservations, or damages '
-                          'resulting from misuse or reliance on system information.',
-                    ),
+                    _SectionTitle(l10n.get('tou_sec5_title')),
+                    _SectionText(l10n.get('tou_sec5_text')),
 
-                    _SectionTitle('6. Modifications to the Terms'),
-                    _SectionText(
-                      'These Terms of Use may be updated to reflect system changes or policy updates. '
-                          'Continued use of RoomReserve after modifications constitutes acceptance of the '
-                          'revised terms.',
-                    ),
+                    _SectionTitle(l10n.get('tou_sec6_title')),
+                    _SectionText(l10n.get('tou_sec6_text')),
 
-                    SizedBox(height: 16),
+                    const SizedBox(height: 16),
 
                     Center(
                       child: Text(
-                        'Last updated: January 2026',
-                        style: TextStyle(
+                        l10n.get('lastUpdated'),
+                        style: const TextStyle(
                           fontSize: 12,
                           color: Colors.grey,
                         ),

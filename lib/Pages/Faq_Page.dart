@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
 
 class FaqPage extends StatelessWidget {
   const FaqPage({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
       body: SafeArea(
@@ -21,11 +24,11 @@ class FaqPage extends StatelessWidget {
                     onPressed: () => Navigator.pop(context),
                     icon: const Icon(Icons.arrow_back_ios_new),
                   ),
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'FAQ',
+                      l10n.get('faq'),
                       textAlign: TextAlign.center,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w700,
                       ),
@@ -42,59 +45,34 @@ class FaqPage extends StatelessWidget {
                 const EdgeInsets.only(left: 20, right: 20, bottom: 20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    _SectionTitle('1. What is RoomReserve?'),
-                    _SectionText(
-                      'RoomReserve is a campus facility booking and utilization monitoring system '
-                          'that allows authorized users to reserve classrooms, laboratories, and other '
-                          'shared spaces in an organized and centralized manner.',
-                    ),
+                  children: [
+                    _SectionTitle(l10n.get('faq_sec1_title')),
+                    _SectionText(l10n.get('faq_sec1_text')),
 
-                    _SectionTitle('2. Who can use the system?'),
-                    _SectionText(
-                      'The system is intended for school administrators, faculty, staff, and other '
-                          'authorized users. Access and permissions depend on the user role assigned by '
-                          'the institution.',
-                    ),
+                    _SectionTitle(l10n.get('faq_sec2_title')),
+                    _SectionText(l10n.get('faq_sec2_text')),
 
-                    _SectionTitle('3. How do I book a room?'),
-                    _SectionText(
-                      'Users can view available rooms in real time and submit a reservation request '
-                          'by selecting the desired room, date, and time. All bookings may require '
-                          'administrative approval.',
-                    ),
+                    _SectionTitle(l10n.get('faq_sec3_title')),
+                    _SectionText(l10n.get('faq_sec3_text')),
 
-                    _SectionTitle('4. Can I edit or cancel a reservation?'),
-                    _SectionText(
-                      'Yes. Users may edit or cancel their reservation requests before approval. '
-                          'Once approved, changes may be subject to administrative policies.',
-                    ),
+                    _SectionTitle(l10n.get('faq_sec4_title')),
+                    _SectionText(l10n.get('faq_sec4_text')),
 
-                    _SectionTitle('5. How does the approval process work?'),
-                    _SectionText(
-                      'Administrators review reservation requests to avoid conflicts and ensure '
-                          'proper use of facilities. Users are notified once their request is approved '
-                          'or rejected.',
-                    ),
+                    _SectionTitle(l10n.get('faq_sec5_title')),
+                    _SectionText(l10n.get('faq_sec5_text')),
 
-                    _SectionTitle('6. Does the system show real-time availability?'),
-                    _SectionText(
-                      'Yes. Room availability is updated based on approved bookings, allowing users '
-                          'to see which rooms are free or occupied at a given time.',
-                    ),
+                    _SectionTitle(l10n.get('faq_sec6_title')),
+                    _SectionText(l10n.get('faq_sec6_text')),
 
-                    _SectionTitle('7. Is my information secure?'),
-                    _SectionText(
-                      'The system applies standard security measures to protect user data and '
-                          'reservation records. Access is restricted based on user roles.',
-                    ),
+                    _SectionTitle(l10n.get('faq_sec7_title')),
+                    _SectionText(l10n.get('faq_sec7_text')),
 
-                    SizedBox(height: 16),
+                    const SizedBox(height: 16),
 
                     Center(
                       child: Text(
-                        'Need more help? Contact the system administrator.',
-                        style: TextStyle(
+                        l10n.get('needMoreHelp'),
+                        style: const TextStyle(
                           fontSize: 12,
                           color: Colors.grey,
                         ),

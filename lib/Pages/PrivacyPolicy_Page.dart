@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
 
 class PrivacyPolicyPage extends StatelessWidget {
   const PrivacyPolicyPage({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
       body: SafeArea(
@@ -21,11 +24,11 @@ class PrivacyPolicyPage extends StatelessWidget {
                     onPressed: () => Navigator.pop(context),
                     icon: const Icon(Icons.arrow_back_ios_new),
                   ),
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'Privacy Policy',
+                      l10n.get('privacyPolicy'),
                       textAlign: TextAlign.center,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w700,
                       ),
@@ -42,64 +45,34 @@ class PrivacyPolicyPage extends StatelessWidget {
                 const EdgeInsets.only(left: 20, right: 20, bottom: 20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    _SectionTitle('1. Information We Collect'),
-                    _SectionText(
-                      'RoomReserve may collect basic personal information such as your name, '
-                          'email address, and user role when you create an account or access the system. '
-                          'Reservation details, booking history, and room usage data are also recorded '
-                          'to support system functionality.',
-                    ),
+                  children: [
+                    _SectionTitle(l10n.get('pp_sec1_title')),
+                    _SectionText(l10n.get('pp_sec1_text')),
 
-                    _SectionTitle('2. How We Use Your Information'),
-                    _SectionText(
-                      'Collected information is used to manage room reservations, verify user '
-                          'authorization, process approvals, generate utilization reports, and improve '
-                          'overall system performance and reliability.',
-                    ),
+                    _SectionTitle(l10n.get('pp_sec2_title')),
+                    _SectionText(l10n.get('pp_sec2_text')),
 
-                    _SectionTitle('3. Data Storage and Security'),
-                    _SectionText(
-                      'Reasonable administrative and technical measures are applied to protect '
-                          'stored data from unauthorized access, alteration, or disclosure. While '
-                          'security practices are implemented, no digital system can guarantee absolute '
-                          'data security.',
-                    ),
+                    _SectionTitle(l10n.get('pp_sec3_title')),
+                    _SectionText(l10n.get('pp_sec3_text')),
 
-                    _SectionTitle('4. Sharing of Information'),
-                    _SectionText(
-                      'Personal information and reservation records are not sold or shared with '
-                          'third parties, except when required by institutional policies, system '
-                          'operations, or applicable laws and regulations.',
-                    ),
+                    _SectionTitle(l10n.get('pp_sec4_title')),
+                    _SectionText(l10n.get('pp_sec4_text')),
 
-                    _SectionTitle('5. Third-Party Services'),
-                    _SectionText(
-                      'RoomReserve may integrate third-party services for authentication, hosting, '
-                          'or analytics. These services operate under their own privacy policies and are '
-                          'used only to support core system functions.',
-                    ),
+                    _SectionTitle(l10n.get('pp_sec5_title')),
+                    _SectionText(l10n.get('pp_sec5_text')),
 
-                    _SectionTitle('6. User Rights and Responsibilities'),
-                    _SectionText(
-                      'Users may request access to or correction of their personal information '
-                          'through system administrators. Users are responsible for ensuring the '
-                          'accuracy of submitted reservation details.',
-                    ),
+                    _SectionTitle(l10n.get('pp_sec6_title')),
+                    _SectionText(l10n.get('pp_sec6_text')),
 
-                    _SectionTitle('7. Changes to This Policy'),
-                    _SectionText(
-                      'This Privacy Policy may be updated to reflect system improvements or policy '
-                          'changes. Continued use of RoomReserve after updates signifies acceptance of '
-                          'the revised policy.',
-                    ),
+                    _SectionTitle(l10n.get('pp_sec7_title')),
+                    _SectionText(l10n.get('pp_sec7_text')),
 
-                    SizedBox(height: 16),
+                    const SizedBox(height: 16),
 
                     Center(
                       child: Text(
-                        'Last updated: January 2026',
-                        style: TextStyle(
+                        l10n.get('lastUpdated'),
+                        style: const TextStyle(
                           fontSize: 12,
                           color: Colors.grey,
                         ),

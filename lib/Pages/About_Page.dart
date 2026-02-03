@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
 
 class AboutPage extends StatelessWidget {
   const AboutPage({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
       body: SafeArea(
@@ -21,11 +24,11 @@ class AboutPage extends StatelessWidget {
                     onPressed: () => Navigator.pop(context),
                     icon: const Icon(Icons.arrow_back_ios_new),
                   ),
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'About',
+                      l10n.get('aboutApp'),
                       textAlign: TextAlign.center,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w700,
                       ),
@@ -42,51 +45,28 @@ class AboutPage extends StatelessWidget {
                 const EdgeInsets.only(left: 20, right: 20, bottom: 20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    _SectionTitle('1. About the Application'),
-                    _SectionText(
-                      'RoomReserve is a campus facility booking and utilization monitoring system '
-                          'designed to help educational institutions efficiently manage classrooms, '
-                          'laboratories, conference rooms, and other shared facilities through a '
-                          'centralized digital platform.',
-                    ),
+                  children: [
+                    _SectionTitle(l10n.get('about_sec1_title')),
+                    _SectionText(l10n.get('about_sec1_text')),
 
-                    _SectionTitle('2. Purpose'),
-                    _SectionText(
-                      'The purpose of this application is to streamline the reservation process, '
-                          'prevent scheduling conflicts, and improve overall facility utilization. '
-                          'It aims to provide administrators, faculty, and authorized users with a '
-                          'reliable and transparent room booking solution.',
-                    ),
+                    _SectionTitle(l10n.get('about_sec2_title')),
+                    _SectionText(l10n.get('about_sec2_text')),
 
-                    _SectionTitle('3. How It Works'),
-                    _SectionText(
-                      'Users can view available rooms in real time and submit reservation requests '
-                          'based on their needs. Administrators review and approve bookings, while the '
-                          'system tracks room usage, availability, and booking history for monitoring '
-                          'and reporting purposes.',
-                    ),
+                    _SectionTitle(l10n.get('about_sec3_title')),
+                    _SectionText(l10n.get('about_sec3_text')),
 
-                    _SectionTitle('4. Project Background'),
-                    _SectionText(
-                      'RoomReserve is developed as part of an academic capstone project focusing on '
-                          'information systems development, usability, and efficient resource '
-                          'management within educational institutions.',
-                    ),
+                    _SectionTitle(l10n.get('about_sec4_title')),
+                    _SectionText(l10n.get('about_sec4_text')),
 
-                    _SectionTitle('5. Disclaimer'),
-                    _SectionText(
-                      'Room availability and booking status depend on system data and administrative '
-                          'approval. Users are responsible for following institutional policies when '
-                          'reserving and using campus facilities.',
-                    ),
+                    _SectionTitle(l10n.get('about_sec5_title')),
+                    _SectionText(l10n.get('about_sec5_text')),
 
-                    SizedBox(height: 16),
+                    const SizedBox(height: 16),
 
                     Center(
                       child: Text(
-                        'Version 1.0.0',
-                        style: TextStyle(
+                        l10n.get('version'),
+                        style: const TextStyle(
                           fontSize: 12,
                           color: Colors.grey,
                         ),
