@@ -35,6 +35,12 @@ class _RoomsPageState extends State<RoomsPage> {
   String? _selectedBuilding;
   String? _selectedFloor;
 
+  // Dynamic Filter Options
+  List<String> _types = [];
+  List<String> _buildings = [];
+  List<String> _floors = [];
+  List<String> _availabilities = [];
+
   @override
   void initState() {
     super.initState();
@@ -68,6 +74,23 @@ class _RoomsPageState extends State<RoomsPage> {
     _searchController.dispose();
     _debounce?.cancel(); // Cancel timer
     super.dispose();
+  }
+
+  String _getLocalizedRoomType(String type, AppLocalizations l10n) {
+    String key = type.toLowerCase().replaceAll(' ', '');
+    String localized = l10n.get(key);
+    if (localized == key) return capitalizeFirst(type);
+    return localized;
+  }
+
+  String _getLocalizedFloor(String floor, AppLocalizations l10n) {
+    String f = floor.toLowerCase().replaceAll(' ', '');
+    if (f.contains('ground')) return l10n.get('groundFloor');
+    if (f.contains('1st')) return l10n.get('1stFloor');
+    if (f.contains('2nd')) return l10n.get('2ndFloor');
+    if (f.contains('3rd')) return l10n.get('3rdFloor');
+    if (f.contains('4th')) return l10n.get('4thFloor');
+    return floor;
   }
 
   @override
@@ -147,11 +170,13 @@ class _RoomsPageState extends State<RoomsPage> {
                         ),
                         const SizedBox(width: 10),
                         GestureDetector(
-                          onTap: () => _showFilterSheet(
-                            types: [], 
-                            buildings: [], 
-                            floors: [],
-                          ),
+                          onTap: () {
+                            _showFilterSheet(
+                              types: _types,
+                              buildings: _buildings,
+                              floors: _floors,
+                            );
+                          },
                           child: Container(
                             height: 48,
                             width: 48,
@@ -262,8 +287,38 @@ class _RoomsPageState extends State<RoomsPage> {
           return Room.fromFirestore(doc);
         }).toList();
 
+        // Update dynamic filter values for the UI
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            final newTypes = allRooms.map((r) => r.type).toSet().toList()..sort();
+            final newBuildings = allRooms.map((r) => r.building).toSet().toList()..sort();
+            final newFloors = allRooms.map((r) => r.floor).toSet().toList()..sort();
+            final newAvailabilities = allRooms
+                .map((r) => r.isAvailable ? l10n.get('available') : l10n.get('occupied'))
+                .toSet()
+                .toList()
+              ..sort();
+
+            if (newTypes.length != _types.length || 
+                newBuildings.length != _buildings.length || 
+                newFloors.length != _floors.length ||
+                newAvailabilities.length != _availabilities.length) {
+              setState(() {
+                _types = newTypes;
+                _buildings = newBuildings;
+                _floors = newFloors;
+                _availabilities = newAvailabilities;
+              });
+            }
+          }
+        });
+
         final filteredRooms = _filterRooms(allRooms, _query);
         final groupedRooms = _groupRoomsByType(filteredRooms);
+
+        if (filteredRooms.isEmpty && _query.isEmpty && !_hasActiveFilters()) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
         if (filteredRooms.isEmpty) {
           return Center(
@@ -316,6 +371,7 @@ class _RoomsPageState extends State<RoomsPage> {
 
   List<Room> _filterRooms(List<Room> rooms, String query) {
     return rooms.where((room) {
+      final l10n = AppLocalizations.of(context);
       if (query.isNotEmpty) {
         final matchesSearch = room.name.toLowerCase().contains(query) ||
             room.type.toLowerCase().contains(query) ||
@@ -324,7 +380,6 @@ class _RoomsPageState extends State<RoomsPage> {
       }
 
       if (_selectedAvailability != null) {
-        final l10n = AppLocalizations.of(context);
         final needsAvailable = _selectedAvailability == l10n.get('available');
         if (room.isAvailable != needsAvailable) return false;
       }
@@ -399,21 +454,23 @@ class _RoomsPageState extends State<RoomsPage> {
                   _buildDropdown(
                     label: l10n.get('availability'),
                     value: _selectedAvailability,
-                    items: [l10n.get('available'), l10n.get('occupied')],
+                    items: _availabilities,
                     onChanged: (val) {
                       setModalState(() => _selectedAvailability = val);
                       setState(() {});
                     },
+                    l10n: l10n,
                   ),
                   _buildDropdown(
                     label: l10n.get('type'),
                     value: _selectedType,
                     items: types,
-                    capitalizeItems: true,
+                    itemLabelMapper: (item) => _getLocalizedRoomType(item, l10n),
                     onChanged: (val) {
                       setModalState(() => _selectedType = val);
                       setState(() {});
                     },
+                    l10n: l10n,
                   ),
                   _buildDropdown(
                     label: l10n.get('building'),
@@ -424,16 +481,19 @@ class _RoomsPageState extends State<RoomsPage> {
                       setModalState(() => _selectedBuilding = val);
                       setState(() {});
                     },
+                    l10n: l10n,
                   ),
                   _buildDropdown(
                     label: l10n.get('floor'),
                     value: _selectedFloor,
                     items: floors,
+                    itemLabelMapper: (item) => _getLocalizedFloor(item, l10n),
                     capitalizeItems: false,
                     onChanged: (val) {
                       setModalState(() => _selectedFloor = val);
                       setState(() {});
                     },
+                    l10n: l10n,
                   ),
                   const SizedBox(height: 10),
                   SizedBox(
@@ -471,8 +531,11 @@ class _RoomsPageState extends State<RoomsPage> {
     required String? value,
     required List<String> items,
     required Function(String?) onChanged,
+    required AppLocalizations l10n,
     bool capitalizeItems = false,
+    String Function(String)? itemLabelMapper,
   }) {
+    final bool isDisabled = items.length <= 1;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Column(
@@ -482,7 +545,7 @@ class _RoomsPageState extends State<RoomsPage> {
             label,
             style: TextStyle(
               fontSize: 14,
-              color: Colors.grey.shade700,
+              color: isDisabled ? Colors.grey.shade400 : Colors.grey.shade700,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -490,6 +553,8 @@ class _RoomsPageState extends State<RoomsPage> {
           DropdownButtonFormField<String>(
             value: value,
             decoration: InputDecoration(
+              filled: isDisabled,
+              fillColor: isDisabled ? Colors.grey.shade100 : null,
               contentPadding:
               const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
               border: OutlineInputBorder(
@@ -501,15 +566,20 @@ class _RoomsPageState extends State<RoomsPage> {
                 borderSide: BorderSide(color: Colors.grey.shade300),
               ),
             ),
-            hint: Text('Select $label'),
+            hint: Text(
+              isDisabled 
+                ? (items.isNotEmpty ? (itemLabelMapper != null ? itemLabelMapper(items.first) : (capitalizeItems ? capitalizeFirst(items.first) : items.first)) : '${l10n.get('select')} $label')
+                : '${l10n.get('select')} $label',
+              style: TextStyle(color: isDisabled ? Colors.grey.shade500 : null),
+            ),
             isExpanded: true,
-            items: items.map((item) {
+            items: isDisabled ? null : items.map((item) {
               return DropdownMenuItem(
                 value: item,
-                child: Text(capitalizeItems ? capitalizeFirst(item) : item),
+                child: Text(itemLabelMapper != null ? itemLabelMapper(item) : (capitalizeItems ? capitalizeFirst(item) : item)),
               );
             }).toList(),
-            onChanged: onChanged,
+            onChanged: isDisabled ? null : onChanged,
           ),
         ],
       ),
@@ -532,6 +602,12 @@ class RoomTypeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context);
+
+    // Localize room type for display
+    String key = type.toLowerCase().replaceAll(' ', '');
+    String localizedType = l10n.get(key);
+    if (localizedType == key) localizedType = capitalizeFirst(type);
 
     return Card(
       elevation: 0,
@@ -549,7 +625,7 @@ class RoomTypeCard extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(top: 10, bottom: 5),
               child: Text(
-                capitalizeFirst(type),
+                localizedType,
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
@@ -598,6 +674,23 @@ class _RoomRow extends StatelessWidget {
     required this.colorScheme,
   });
 
+  String _getLocalizedFloor(String floor, AppLocalizations l10n) {
+    String f = floor.toLowerCase().replaceAll(' ', '');
+    if (f.contains('ground')) return l10n.get('groundFloor');
+    if (f.contains('1st')) return l10n.get('1stFloor');
+    if (f.contains('2nd')) return l10n.get('2ndFloor');
+    if (f.contains('3rd')) return l10n.get('3rdFloor');
+    if (f.contains('4th')) return l10n.get('4thFloor');
+    return floor;
+  }
+
+  String _getLocalizedRoomType(String type, AppLocalizations l10n) {
+    String key = type.toLowerCase().replaceAll(' ', '');
+    String localized = l10n.get(key);
+    if (localized == key) return capitalizeFirst(type);
+    return localized;
+  }
+
   @override
   Widget build(BuildContext context) {
     final borderColor = Colors.grey.shade400;
@@ -612,7 +705,7 @@ class _RoomRow extends StatelessWidget {
           height: 74,
           width: 74,
           decoration: BoxDecoration(
-            color: colorScheme.primary.withOpacity(0.15),
+            color: colorScheme.primary.withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(
@@ -640,7 +733,7 @@ class _RoomRow extends StatelessWidget {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      capitalizeFirst(room.type),
+                      _getLocalizedRoomType(room.type, l10n),
                       style: const TextStyle(
                         fontSize: 13,
                         color: Colors.grey,
@@ -649,7 +742,7 @@ class _RoomRow extends StatelessWidget {
                   ],
                 ),
                 Text(
-                  '${room.building} • ${room.floor}',
+                  '${room.building} • ${_getLocalizedFloor(room.floor, l10n)}',
                   style: const TextStyle(
                     fontSize: 13,
                     color: Colors.grey,

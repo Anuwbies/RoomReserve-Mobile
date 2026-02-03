@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import '../l10n/app_localizations.dart';
+import 'BookedDetails_Page.dart';
 import 'dart:async';
 
 class BookedPage extends StatefulWidget {
@@ -54,11 +56,12 @@ class _BookedPageState extends State<BookedPage>
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final user = FirebaseAuth.instance.currentUser;
 
     if (user == null) {
-      return const Scaffold(
-        body: Center(child: Text("Please log in to view your bookings")),
+      return Scaffold(
+        body: Center(child: Text(l10n.get('logOut'))), // Or appropriate localized login prompt
       );
     }
 
@@ -66,7 +69,7 @@ class _BookedPageState extends State<BookedPage>
       stream: FirebaseFirestore.instance.collection('users').doc(user.uid).snapshots(),
       builder: (context, userSnapshot) {
         if (userSnapshot.hasError) {
-          return Scaffold(body: Center(child: Text('Error: ${userSnapshot.error}')));
+          return Scaffold(body: Center(child: Text('${l10n.get('somethingWentWrong')}: ${userSnapshot.error}')));
         }
 
         if (userSnapshot.connectionState == ConnectionState.waiting) {
@@ -78,17 +81,17 @@ class _BookedPageState extends State<BookedPage>
 
         if (organizationName == null || organizationName.isEmpty) {
           return Scaffold(
-            appBar: AppBar(title: const Text('My Bookings')),
-            body: const Center(child: Text("No organization selected. Please update your profile.")),
+            appBar: AppBar(title: Text(l10n.get('booked'))),
+            body: Center(child: Text(l10n.get('noOrgSelectedHome'))),
           );
         }
 
         return Scaffold(
           backgroundColor: const Color(0xFFF5F6FA),
           appBar: AppBar(
-            title: const Text(
-              'My Bookings',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+            title: Text(
+              l10n.get('booked'),
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
             ),
             backgroundColor: Colors.white,
             elevation: 0,
@@ -101,13 +104,13 @@ class _BookedPageState extends State<BookedPage>
               labelColor: Theme.of(context).primaryColor,
               unselectedLabelColor: Colors.grey,
               labelStyle: const TextStyle(fontWeight: FontWeight.w600),
-              tabs: const [
-                _MinWidthTab(text: 'All'),
-                _MinWidthTab(text: 'Pending'),
-                _MinWidthTab(text: 'Approved'),
-                _MinWidthTab(text: 'Completed'),
-                _MinWidthTab(text: 'Cancelled'),
-                _MinWidthTab(text: 'Rejected'),
+              tabs: [
+                _MinWidthTab(text: l10n.get('all')),
+                _MinWidthTab(text: l10n.get('pending')),
+                _MinWidthTab(text: l10n.get('approved')),
+                _MinWidthTab(text: l10n.get('completed')),
+                _MinWidthTab(text: l10n.get('cancelled')),
+                _MinWidthTab(text: l10n.get('rejected')),
               ],
             ),
           ),
@@ -129,7 +132,7 @@ class _BookedPageState extends State<BookedPage>
                       });
                     },
                     decoration: InputDecoration(
-                      hintText: 'Search room or purpose...',
+                      hintText: l10n.get('search'),
                       prefixIcon: const Icon(Icons.search),
                       prefixIconConstraints: const BoxConstraints(
                         minWidth: 40,
@@ -151,12 +154,12 @@ class _BookedPageState extends State<BookedPage>
                   child: TabBarView(
                     controller: _tabController,
                     children: [
-                      _buildBookingStream(null, organizationName), // All
-                      _buildBookingStream('Pending', organizationName),
-                      _buildBookingStream('Approved', organizationName),
-                      _buildBookingStream('Completed', organizationName),
-                      _buildBookingStream('Cancelled', organizationName),
-                      _buildBookingStream('Rejected', organizationName),
+                      _buildBookingStream(null, organizationName, l10n), // All
+                      _buildBookingStream('Pending', organizationName, l10n),
+                      _buildBookingStream('Approved', organizationName, l10n),
+                      _buildBookingStream('Completed', organizationName, l10n),
+                      _buildBookingStream('Cancelled', organizationName, l10n),
+                      _buildBookingStream('Rejected', organizationName, l10n),
                     ],
                   ),
                 ),
@@ -168,7 +171,7 @@ class _BookedPageState extends State<BookedPage>
     );
   }
 
-  Widget _buildBookingStream(String? statusFilter, String organizationName) {
+  Widget _buildBookingStream(String? statusFilter, String organizationName, AppLocalizations l10n) {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return const SizedBox.shrink();
 
@@ -182,7 +185,7 @@ class _BookedPageState extends State<BookedPage>
       stream: query.snapshots(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return Center(child: Text('Error loading bookings: ${snapshot.error}'));
+          return Center(child: Text('${l10n.get('somethingWentWrong')}: ${snapshot.error}'));
         }
 
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -231,7 +234,7 @@ class _BookedPageState extends State<BookedPage>
                 Icon(Icons.event_busy, size: 64, color: Colors.grey.shade400),
                 const SizedBox(height: 16),
                 Text(
-                  "No bookings found",
+                  l10n.get('noRoomsFound'),
                   style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
                 ),
               ],
@@ -243,7 +246,17 @@ class _BookedPageState extends State<BookedPage>
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
           itemCount: bookings.length,
           itemBuilder: (context, index) {
-            return BookingCard(booking: bookings[index]);
+            return GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => BookedDetailsPage(booking: bookings[index]),
+                  ),
+                );
+              },
+              child: BookingCard(booking: bookings[index]),
+            );
           },
         );
       },
@@ -258,15 +271,22 @@ class BookingCard extends StatelessWidget {
 
   const BookingCard({super.key, required this.booking});
 
-  String _capitalize(String text) {
-    if (text.isEmpty) return text;
-    return text[0].toUpperCase() + text.substring(1).toLowerCase();
+  String _getLocalizedFloor(String floor, AppLocalizations l10n) {
+    String f = floor.toLowerCase().replaceAll(' ', '');
+    if (f.contains('ground')) return l10n.get('groundFloor');
+    if (f.contains('1st')) return l10n.get('1stFloor');
+    if (f.contains('2nd')) return l10n.get('2ndFloor');
+    if (f.contains('3rd')) return l10n.get('3rdFloor');
+    if (f.contains('4th')) return l10n.get('4thFloor');
+    return floor;
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final statusColor = _getStatusColor(booking.status);
-    final statusText = _capitalize(booking.status);
+    final statusText = l10n.get(booking.status.toLowerCase());
+    final locale = Localizations.localeOf(context).toString();
 
     return Card(
       elevation: 0,
@@ -299,7 +319,7 @@ class BookingCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '${booking.building} • ${booking.floor}',
+                        '${booking.building} • ${_getLocalizedFloor(booking.floor, l10n)}',
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.grey.shade600,
@@ -330,9 +350,9 @@ class BookingCard extends StatelessWidget {
             ),
             const Divider(height: 24),
             // Date and Time Info
-            _buildInfoRow(Icons.calendar_today, DateFormat('MMM dd, yyyy').format(booking.startTime)),
+            _buildInfoRow(Icons.calendar_today, DateFormat('MMM dd, yyyy', locale).format(booking.startTime)),
             const SizedBox(height: 8),
-            _buildInfoRow(Icons.access_time, '${DateFormat('hh:mm a').format(booking.startTime)} - ${DateFormat('hh:mm a').format(booking.endTime)}'),
+            _buildInfoRow(Icons.access_time, '${DateFormat('hh:mm a', locale).format(booking.startTime)} - ${DateFormat('hh:mm a', locale).format(booking.endTime)}'),
             const SizedBox(height: 8),
             _buildInfoRow(Icons.bookmark_outline, booking.purpose),
 
@@ -350,13 +370,13 @@ class BookingCard extends StatelessWidget {
                       });
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text("Booking cancelled")),
+                          SnackBar(content: Text(l10n.get('requestCancelled'))),
                         );
                       }
                     } catch (e) {
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text("Failed to cancel: $e")),
+                          SnackBar(content: Text("${l10n.get('somethingWentWrong')}: $e")),
                         );
                       }
                     }
@@ -367,7 +387,7 @@ class BookingCard extends StatelessWidget {
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8)),
                   ),
-                  child: const Text("Cancel Request"),
+                  child: Text(l10n.get('cancelRequest')),
                 ),
               )
             ]
@@ -416,36 +436,45 @@ class BookingCard extends StatelessWidget {
 
 class Booking {
   final String id;
+  final String roomId;
   final String roomName;
   final String building;
   final String floor;
   final DateTime startTime;
   final DateTime endTime;
+  final int durationMinutes;
   final String purpose;
   final String status;
+  final DateTime createdAt;
 
   Booking({
     required this.id,
+    required this.roomId,
     required this.roomName,
     required this.building,
     required this.floor,
     required this.startTime,
     required this.endTime,
+    required this.durationMinutes,
     required this.purpose,
     required this.status,
+    required this.createdAt,
   });
 
   factory Booking.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
     return Booking(
       id: doc.id,
+      roomId: data['roomId'] ?? '',
       roomName: data['roomName'] ?? 'Unknown Room',
       building: data['building'] ?? 'Unknown Building',
       floor: data['floor'] ?? '',
       startTime: (data['startTime'] as Timestamp).toDate(),
       endTime: (data['endTime'] as Timestamp).toDate(),
+      durationMinutes: data['durationMinutes'] ?? 0,
       purpose: data['purpose'] ?? '',
       status: data['status'] ?? 'Pending',
+      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
   }
 }

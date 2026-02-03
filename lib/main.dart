@@ -45,7 +45,9 @@ class RoomReserveApp extends StatelessWidget {
       ],
       supportedLocales: const [
         Locale('en'),
-        Locale('ja'),  // Japanese
+        Locale('ja'),
+        Locale('ko'),
+        Locale('fil'),
       ],
       home: const AuthGate(),
     );

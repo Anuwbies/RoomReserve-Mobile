@@ -155,13 +155,24 @@ class _ReservePageState extends State<ReservePage> {
     super.dispose();
   }
 
-  String _formatDuration(int minutes) {
-    if (minutes < 60) return "${minutes}mins";
+  String _getLocalizedFloor(String floor, AppLocalizations l10n) {
+    String f = floor.toLowerCase().replaceAll(' ', '');
+    if (f.contains('ground')) return l10n.get('groundFloor');
+    if (f.contains('1st')) return l10n.get('1stFloor');
+    if (f.contains('2nd')) return l10n.get('2ndFloor');
+    if (f.contains('3rd')) return l10n.get('3rdFloor');
+    if (f.contains('4th')) return l10n.get('4thFloor');
+    return floor;
+  }
+
+  String _formatDuration(int minutes, AppLocalizations l10n) {
+    if (minutes < 60) return "$minutes ${l10n.get('mins')}";
     int hours = minutes ~/ 60;
     int remainingMinutes = minutes % 60;
-    String hoursText = hours == 1 ? "1hr" : "${hours}hrs";
+    String hoursText =
+        hours == 1 ? "1 ${l10n.get('hour')}" : "$hours ${l10n.get('hours')}";
     if (remainingMinutes == 0) return hoursText;
-    return "$hoursText • ${remainingMinutes}mins";
+    return "$hoursText • $remainingMinutes ${l10n.get('mins')}";
   }
 
   TimeOfDay? _parseTime(String? timeStr) {
@@ -353,6 +364,7 @@ class _ReservePageState extends State<ReservePage> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final colorScheme = Theme.of(context).colorScheme;
+    final locale = Localizations.localeOf(context).toString();
 
     final int maxDuration = (widget.room.bookingRules['maxDurationMinutes'] as int?) ?? 1440;
     final List<int> durationOptions = [15, 30, 45, 60, 90, 120, 180, 240, 480]
@@ -418,7 +430,7 @@ class _ReservePageState extends State<ReservePage> {
                           borderRadius: BorderRadius.circular(16),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.04),
+                              color: Colors.black.withValues(alpha: 0.04),
                               blurRadius: 10,
                               offset: const Offset(0, 4),
                             ),
@@ -429,7 +441,7 @@ class _ReservePageState extends State<ReservePage> {
                             Container(
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: colorScheme.primary.withOpacity(0.1),
+                                color: colorScheme.primary.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Icon(Icons.meeting_room_rounded, color: colorScheme.primary, size: 30),
@@ -448,7 +460,7 @@ class _ReservePageState extends State<ReservePage> {
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    '${widget.room.building} • ${widget.room.floor}',
+                                    '${widget.room.building} • ${_getLocalizedFloor(widget.room.floor, l10n)}',
                                     style: TextStyle(
                                       color: Colors.grey.shade600,
                                       fontSize: 14,
@@ -465,7 +477,7 @@ class _ReservePageState extends State<ReservePage> {
                       const SizedBox(height: 5),
                       _SelectionTile(
                         label: l10n.get('selectDate'),
-                        value: DateFormat('EEEE, MMM d, yyyy').format(_selectedDate),
+                        value: DateFormat('EEEE, MMM d, yyyy', locale).format(_selectedDate),
                         icon: Icons.calendar_today_rounded,
                         onTap: () => _selectDate(context),
                       ),
@@ -474,7 +486,7 @@ class _ReservePageState extends State<ReservePage> {
                       const SizedBox(height: 5),
                       _SelectionTile(
                         label: l10n.get('selectTime'),
-                        value: _startTime.format(context),
+                        value: DateFormat('h:mm a', locale).format(DateTime(2024, 1, 1, _startTime.hour, _startTime.minute)),
                         icon: Icons.access_time_rounded,
                         onTap: () => _selectTime(context),
                         errorText: _timeErrorMessage,
@@ -499,7 +511,7 @@ class _ReservePageState extends State<ReservePage> {
                             items: durationOptions.map((int value) {
                               return DropdownMenuItem<int>(
                                 value: value,
-                                child: Text(_formatDuration(value)),
+                                child: Text(_formatDuration(value, l10n)),
                               );
                             }).toList(),
                             onChanged: (int? newValue) {
@@ -511,8 +523,8 @@ class _ReservePageState extends State<ReservePage> {
                             validator: (value) {
                               final min = widget.room.bookingRules['minDurationMinutes'] as int? ?? 0;
                               final max = widget.room.bookingRules['maxDurationMinutes'] as int? ?? 1440;
-                              if (value! < min && min > 0) return 'Min: ${_formatDuration(min)}';
-                              if (value > max && max > 0) return 'Max: ${_formatDuration(max)}';
+                              if (value! < min && min > 0) return 'Min: ${_formatDuration(min, l10n)}';
+                              if (value > max && max > 0) return 'Max: ${_formatDuration(max, l10n)}';
                               return null;
                             },
                           ),
@@ -561,7 +573,7 @@ class _ReservePageState extends State<ReservePage> {
               decoration: BoxDecoration(
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
+                    color: Colors.black.withValues(alpha: 0.05),
                     blurRadius: 10,
                     offset: const Offset(0, -5),
                   ),
@@ -653,6 +665,7 @@ class _ReservePageState extends State<ReservePage> {
   }
 
   Widget _buildExistingReservationsList(ScrollController scrollController, AppLocalizations l10n) {
+    final locale = Localizations.localeOf(context).toString();
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('bookings')
@@ -724,7 +737,7 @@ class _ReservePageState extends State<ReservePage> {
                       borderRadius: BorderRadius.circular(10),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.02),
+                          color: Colors.black.withValues(alpha: 0.02),
                           blurRadius: 4,
                           offset: const Offset(0, 2),
                         ),
@@ -738,12 +751,12 @@ class _ReservePageState extends State<ReservePage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          DateFormat('EEEE, MMM d').format(start),
+                          DateFormat('EEEE, MMM d', locale).format(start),
                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          '${DateFormat('h:mm a').format(start)} - ${DateFormat('h:mm a').format(end)}',
+                          '${DateFormat('h:mm a', locale).format(start)} - ${DateFormat('h:mm a', locale).format(end)}',
                           style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
                         ),
                       ],

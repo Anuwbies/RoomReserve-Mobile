@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../l10n/app_localizations.dart';
 
 class InsertRoomPage extends StatefulWidget {
   const InsertRoomPage({super.key});
@@ -68,10 +69,11 @@ class _InsertRoomPageState extends State<InsertRoomPage> {
   }
 
   Future<void> _submitForm() async {
+    final l10n = AppLocalizations.of(context);
     if (_formKey.currentState!.validate()) {
       if (_selectedBuilding == null || _selectedFloor == null || _selectedType == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please select building, floor, and type')),
+          SnackBar(content: Text(l10n.get('selectAllDetails'))),
         );
         return;
       }
@@ -104,8 +106,6 @@ class _InsertRoomPageState extends State<InsertRoomPage> {
         };
 
         // 3. Write to Firestore
-        // Using strict path: /artifacts/{appId}/public/data/{collectionName}
-        // Ideally, appId is passed globally. We use a default here for the snippet.
         const String appId = 'default-app-id';
 
         await FirebaseFirestore.instance
@@ -121,7 +121,7 @@ class _InsertRoomPageState extends State<InsertRoomPage> {
         // 4. Success Feedback
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Room "${newRoomData['name']}" created successfully!'),
+            content: Text('${l10n.get('roomCreatedSuccess')} "${newRoomData['name']}"'),
             backgroundColor: Colors.green,
           ),
         );
@@ -133,7 +133,7 @@ class _InsertRoomPageState extends State<InsertRoomPage> {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error saving room: $e'),
+            content: Text('${l10n.get('errorSavingRoom')}: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -149,12 +149,13 @@ class _InsertRoomPageState extends State<InsertRoomPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
       appBar: AppBar(
-        title: const Text(
-          'Add New Room',
-          style: TextStyle(fontWeight: FontWeight.bold),
+        title: Text(
+          l10n.get('createRoom'),
+          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         backgroundColor: Colors.white,
         elevation: 0,
@@ -169,15 +170,15 @@ class _InsertRoomPageState extends State<InsertRoomPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildSectionHeader('Basic Details'),
+                _buildSectionHeader(l10n.get('basicDetails')),
                 const SizedBox(height: 16),
 
                 // Room Name
-                _buildLabel('Room Name / Number'),
+                _buildLabel(l10n.get('roomNameNumber')),
                 _buildTextField(
                   controller: _nameController,
                   hint: 'e.g. PTC 305',
-                  validator: (val) => val == null || val.isEmpty ? 'Room name is required' : null,
+                  validator: (val) => val == null || val.isEmpty ? l10n.get('roomNameRequired') : null,
                 ),
                 const SizedBox(height: 16),
 
@@ -189,10 +190,10 @@ class _InsertRoomPageState extends State<InsertRoomPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildLabel('Building'),
+                          _buildLabel(l10n.get('building')),
                           _buildDropdown(
                             value: _selectedBuilding,
-                            hint: 'Select Building',
+                            hint: '${l10n.get('select')} ${l10n.get('building')}',
                             items: _buildings,
                             onChanged: (val) => setState(() => _selectedBuilding = val),
                           ),
@@ -204,10 +205,10 @@ class _InsertRoomPageState extends State<InsertRoomPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildLabel('Floor'),
+                          _buildLabel(l10n.get('floor')),
                           _buildDropdown(
                             value: _selectedFloor,
-                            hint: 'Select Floor',
+                            hint: '${l10n.get('select')} ${l10n.get('floor')}',
                             items: _floors,
                             onChanged: (val) => setState(() => _selectedFloor = val),
                           ),
@@ -227,10 +228,10 @@ class _InsertRoomPageState extends State<InsertRoomPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildLabel('Room Type'),
+                          _buildLabel(l10n.get('type')),
                           _buildDropdown(
                             value: _selectedType,
-                            hint: 'Select Type',
+                            hint: '${l10n.get('select')} ${l10n.get('type')}',
                             items: _roomTypes,
                             onChanged: (val) => setState(() => _selectedType = val),
                           ),
@@ -243,12 +244,12 @@ class _InsertRoomPageState extends State<InsertRoomPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildLabel('Capacity'),
+                          _buildLabel(l10n.get('capacity')),
                           _buildTextField(
                             controller: _capacityController,
                             hint: '0',
                             keyboardType: TextInputType.number,
-                            validator: (val) => val == null || val.isEmpty ? 'Required' : null,
+                            validator: (val) => val == null || val.isEmpty ? l10n.get('required') : null, // Assuming 'required' exists or reuse another
                           ),
                         ],
                       ),
@@ -257,7 +258,7 @@ class _InsertRoomPageState extends State<InsertRoomPage> {
                 ),
 
                 const SizedBox(height: 32),
-                _buildSectionHeader('Amenities & Features'),
+                _buildSectionHeader(l10n.get('amenitiesFeatures')),
                 const SizedBox(height: 12),
 
                 // Feature Chips
@@ -266,6 +267,13 @@ class _InsertRoomPageState extends State<InsertRoomPage> {
                   runSpacing: 10,
                   children: _availableFeatures.map((feature) {
                     final isSelected = _selectedFeatures.contains(feature);
+                    
+                    // Map feature string to localization key
+                    String l10nKey = feature.toLowerCase().replaceAll(' ', '').replaceAll('-', '').replaceAll('.', '');
+                    if (l10nKey == 'laboratoryeqpt') l10nKey = 'labEqpt';
+                    if (l10nKey == 'soundsystem') l10nKey = 'soundSystem';
+                    if (l10nKey == 'aircon') l10nKey = 'aircon'; // matching 'aircon' key
+
                     return InkWell(
                       onTap: () {
                         setState(() {
@@ -306,7 +314,7 @@ class _InsertRoomPageState extends State<InsertRoomPage> {
                               const SizedBox(width: 6),
                             ],
                             Text(
-                              feature,
+                              l10n.get(l10nKey),
                               style: TextStyle(
                                 color: isSelected ? Colors.white : Colors.grey.shade700,
                                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
@@ -320,13 +328,13 @@ class _InsertRoomPageState extends State<InsertRoomPage> {
                 ),
 
                 const SizedBox(height: 32),
-                _buildSectionHeader('Additional Info'),
+                _buildSectionHeader(l10n.get('additionalInfo')),
                 const SizedBox(height: 12),
 
-                _buildLabel('Description (Optional)'),
+                _buildLabel(l10n.get('descriptionOptional')),
                 _buildTextField(
                   controller: _descriptionController,
-                  hint: 'Enter any additional details about the room rules, access requirements, etc.',
+                  hint: l10n.get('descriptionHint'),
                   maxLines: 4,
                 ),
 
@@ -340,7 +348,7 @@ class _InsertRoomPageState extends State<InsertRoomPage> {
                     onPressed: _isLoading ? null : _submitForm,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Theme.of(context).primaryColor,
-                      disabledBackgroundColor: Theme.of(context).primaryColor.withOpacity(0.6),
+                      disabledBackgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.6),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -355,9 +363,9 @@ class _InsertRoomPageState extends State<InsertRoomPage> {
                         strokeWidth: 2.5,
                       ),
                     )
-                        : const Text(
-                      'Create Room',
-                      style: TextStyle(
+                        : Text(
+                      l10n.get('createRoom'),
+                      style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,

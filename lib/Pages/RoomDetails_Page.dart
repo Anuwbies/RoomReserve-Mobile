@@ -41,12 +41,12 @@ class _RoomDetailsPageState extends State<RoomDetailsPage> {
   }
 
   String _formatDuration(int minutes, AppLocalizations l10n) {
-    if (minutes < 60) return "$minutes mins";
+    if (minutes < 60) return "$minutes ${l10n.get('mins')}";
     int hours = minutes ~/ 60;
     int remainingMinutes = minutes % 60;
-    String hoursText = hours == 1 ? "1hr" : "${hours}hrs";
+    String hoursText = hours == 1 ? "1 ${l10n.get('hour')}" : "$hours ${l10n.get('hours')}";
     if (remainingMinutes == 0) return hoursText;
-    return "$hoursText • ${remainingMinutes}mins";
+    return "$hoursText • $remainingMinutes ${l10n.get('mins')}";
   }
 
   String _getDayName(int day, BuildContext context) {
@@ -76,13 +76,54 @@ class _RoomDetailsPageState extends State<RoomDetailsPage> {
     final advanceDays = rules['advanceBookingDays'] ?? 0;
     final requiresApproval = rules['requiresApproval'] == true;
 
-    final bool isDescriptionLong = room.description.length > 120;
+    final bool isDescriptionLong = room.description.length > 160;
     final String displayDescription = !_isDescriptionExpanded && isDescriptionLong 
-        ? "${room.description.substring(0, 110)}..." 
+        ? "${room.description.substring(0, 150)}..." 
         : room.description;
 
     final locale = Localizations.localeOf(context).toString();
-    final formattedDate = DateFormat('EEEE, MMM d • HH:mm', locale).format(_now);
+    final formattedDate = DateFormat('EEEE, MMM d • hh:mm a', locale).format(_now);
+
+    String getLocalizedFeature(String feature) {
+      String l10nKey = feature.toLowerCase().replaceAll(' ', '').replaceAll('-', '').replaceAll('.', '');
+      if (l10nKey == 'laboratoryeqpt') l10nKey = 'labEqpt';
+      if (l10nKey == 'soundsystem') l10nKey = 'soundSystem';
+      if (l10nKey == 'aircon') l10nKey = 'aircon';
+      return l10n.get(l10nKey);
+    }
+
+    String getLocalizedFloor(String floor) {
+      String f = floor.toLowerCase().replaceAll(' ', '');
+      if (f.contains('ground')) return l10n.get('groundFloor');
+      if (f.contains('1st')) return l10n.get('1stFloor');
+      if (f.contains('2nd')) return l10n.get('2ndFloor');
+      if (f.contains('3rd')) return l10n.get('3rdFloor');
+      if (f.contains('4th')) return l10n.get('4thFloor');
+      return floor;
+    }
+
+    String getLocalizedRoomType(String type) {
+      String key = type.toLowerCase().replaceAll(' ', '');
+      String localized = l10n.get(key);
+      if (localized == key) return capitalizeFirst(type);
+      return localized;
+    }
+
+    String formatTo12h(String timeStr) {
+      if (timeStr == 'N/A') return timeStr;
+      try {
+        final parts = timeStr.split(':');
+        if (parts.length >= 2) {
+          int hour = int.parse(parts[0]);
+          int minute = int.parse(parts[1]);
+          final dt = DateTime(2024, 1, 1, hour, minute);
+          return DateFormat('h:mm a', locale).format(dt);
+        }
+      } catch (e) {
+        debugPrint('Error formatting time: $e');
+      }
+      return timeStr;
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
@@ -124,8 +165,8 @@ class _RoomDetailsPageState extends State<RoomDetailsPage> {
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
-                            colorScheme.primary.withOpacity(0.15),
-                            colorScheme.primary.withOpacity(0.05),
+                            colorScheme.primary.withValues(alpha: 0.15),
+                            colorScheme.primary.withValues(alpha: 0.05),
                           ],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
@@ -147,11 +188,11 @@ class _RoomDetailsPageState extends State<RoomDetailsPage> {
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: colorScheme.primary.withOpacity(0.1),
+                          color: colorScheme.primary.withValues(alpha: 0.1),
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.02),
+                            color: Colors.black.withValues(alpha: 0.02),
                             blurRadius: 4,
                             offset: const Offset(0, 2),
                           )
@@ -171,7 +212,7 @@ class _RoomDetailsPageState extends State<RoomDetailsPage> {
                               style: TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w600,
-                                color: colorScheme.primary.withOpacity(0.8),
+                                color: colorScheme.primary.withValues(alpha: 0.8),
                               ),
                             ),
                           ),
@@ -220,7 +261,7 @@ class _RoomDetailsPageState extends State<RoomDetailsPage> {
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Text(
-                                  capitalizeFirst(room.type),
+                                  getLocalizedRoomType(room.type),
                                   style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w500,
@@ -234,9 +275,9 @@ class _RoomDetailsPageState extends State<RoomDetailsPage> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                           decoration: BoxDecoration(
-                            color: statusColor.withOpacity(0.1),
+                            color: statusColor.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: statusColor.withOpacity(0.5)),
+                            border: Border.all(color: statusColor.withValues(alpha: 0.5)),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -302,7 +343,7 @@ class _RoomDetailsPageState extends State<RoomDetailsPage> {
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.04),
+                            color: Colors.black.withValues(alpha: 0.04),
                             blurRadius: 15,
                             offset: const Offset(0, 5),
                           ),
@@ -320,7 +361,7 @@ class _RoomDetailsPageState extends State<RoomDetailsPage> {
                             _InfoItem(
                               icon: Icons.layers_rounded,
                               label: l10n.get('floor'),
-                              value: room.floor,
+                              value: getLocalizedFloor(room.floor),
                             ),
                             VerticalDivider(width: 30, color: Colors.grey.shade200),
                             _InfoItem(
@@ -342,7 +383,7 @@ class _RoomDetailsPageState extends State<RoomDetailsPage> {
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.04),
+                            color: Colors.black.withValues(alpha: 0.04),
                             blurRadius: 15,
                             offset: const Offset(0, 5),
                           ),
@@ -363,7 +404,7 @@ class _RoomDetailsPageState extends State<RoomDetailsPage> {
                               const SizedBox(width: 14),
                               Expanded(
                                 child: Text(
-                                  "$startTime - $endTime",
+                                  "${formatTo12h(startTime)} - ${formatTo12h(endTime)}",
                                   style: const TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w600,
@@ -415,7 +456,7 @@ class _RoomDetailsPageState extends State<RoomDetailsPage> {
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.04),
+                            color: Colors.black.withValues(alpha: 0.04),
                             blurRadius: 15,
                             offset: const Offset(0, 5),
                           ),
@@ -453,7 +494,7 @@ class _RoomDetailsPageState extends State<RoomDetailsPage> {
                               border: Border.all(color: Colors.grey.shade300),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.02),
+                                  color: Colors.black.withValues(alpha: 0.02),
                                   blurRadius: 4,
                                   offset: const Offset(0, 2),
                                 ),
@@ -465,7 +506,7 @@ class _RoomDetailsPageState extends State<RoomDetailsPage> {
                                 Icon(tag.icon, size: 16, color: Colors.grey.shade700),
                                 const SizedBox(width: 8),
                                 Text(
-                                  tag.label,
+                                  getLocalizedFeature(tag.label),
                                   style: const TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w500,
@@ -487,7 +528,7 @@ class _RoomDetailsPageState extends State<RoomDetailsPage> {
               decoration: BoxDecoration(
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
+                    color: Colors.black.withValues(alpha: 0.05),
                     blurRadius: 10,
                     offset: const Offset(0, -5),
                   ),

@@ -14,7 +14,7 @@ class LocaleProvider with ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     final String? languageCode = prefs.getString('language_code');
     
-    if (languageCode != null && ['en', 'ja'].contains(languageCode)) {
+    if (languageCode != null && ['en', 'ja', 'ko', 'fil'].contains(languageCode)) {
       _locale = Locale(languageCode);
       debugPrint("Loaded locale from prefs: $languageCode");
       notifyListeners();
@@ -22,7 +22,7 @@ class LocaleProvider with ChangeNotifier {
   }
 
   Future<void> setLocale(Locale locale) async {
-    if (!['en', 'ja'].contains(locale.languageCode)) return;
+    if (!['en', 'ja', 'ko', 'fil'].contains(locale.languageCode)) return;
 
     _locale = locale;
     notifyListeners();

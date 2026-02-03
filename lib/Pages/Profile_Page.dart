@@ -106,6 +106,8 @@ class _ProfilePageState extends State<ProfilePage> {
               const Divider(),
               _LanguageItem(locale: const Locale('en'), name: 'English'),
               _LanguageItem(locale: const Locale('ja'), name: '日本語'),
+              _LanguageItem(locale: const Locale('ko'), name: '한국어'),
+              _LanguageItem(locale: const Locale('fil'), name: 'Filipino'),
             ],
           ),
         );
@@ -582,6 +584,8 @@ class _ProfilePageState extends State<ProfilePage> {
   String _getLanguageName(String code) {
     switch (code) {
       case 'ja': return '日本語';
+      case 'ko': return '한국어';
+      case 'fil': return 'Filipino';
       default: return 'English';
     }
   }

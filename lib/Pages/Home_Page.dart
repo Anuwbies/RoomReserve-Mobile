@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import '../l10n/app_localizations.dart';
+import 'BookedDetails_Page.dart';
+import 'Booked_Page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -11,30 +14,37 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  String _getFormattedDate() {
-    final now = DateTime.now();
-    return DateFormat('EEEE, MMM d').format(now);
+  String _getLocalizedFloor(String floor, AppLocalizations l10n) {
+    String f = floor.toLowerCase().replaceAll(' ', '');
+    if (f.contains('ground')) return l10n.get('groundFloor');
+    if (f.contains('1st')) return l10n.get('1stFloor');
+    if (f.contains('2nd')) return l10n.get('2ndFloor');
+    if (f.contains('3rd')) return l10n.get('3rdFloor');
+    if (f.contains('4th')) return l10n.get('4thFloor');
+    return floor;
   }
 
-  String _capitalize(String text) {
-    if (text.isEmpty) return text;
-    return text[0].toUpperCase() + text.substring(1).toLowerCase();
+  String _getFormattedDate(BuildContext context) {
+    final now = DateTime.now();
+    final locale = Localizations.localeOf(context).toString();
+    return DateFormat('EEEE, MMM d', locale).format(now);
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      return const Scaffold(body: Center(child: Text("Not logged in")));
+      return Scaffold(body: Center(child: Text(l10n.get('logOut')))); // Or appropriate login prompt
     }
 
-    final String displayName = user.displayName?.split(' ')[0] ?? 'Student';
+    final String displayName = user.displayName?.split(' ')[0] ?? l10n.get('student');
 
     return StreamBuilder<DocumentSnapshot>(
       stream: FirebaseFirestore.instance.collection('users').doc(user.uid).snapshots(),
       builder: (context, userSnapshot) {
         if (userSnapshot.hasError) {
-          return Scaffold(body: Center(child: Text('Error: ${userSnapshot.error}')));
+          return Scaffold(body: Center(child: Text('${l10n.get('somethingWentWrong')}: ${userSnapshot.error}')));
         }
 
         if (userSnapshot.connectionState == ConnectionState.waiting) {
@@ -45,7 +55,7 @@ class _HomePageState extends State<HomePage> {
         final organizationName = userData?['organizationName'] as String?;
 
         if (organizationName == null || organizationName.isEmpty) {
-          return _buildNoOrgUI(displayName, user);
+          return _buildNoOrgUI(displayName, user, l10n);
         }
 
         return Scaffold(
@@ -125,31 +135,31 @@ class _HomePageState extends State<HomePage> {
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildHeader(displayName, user),
+                        _buildHeader(displayName, user, l10n),
                         const SizedBox(height: 32),
-                        _buildStatsGrid(pending, approved, rejected, cancelled),
+                        _buildStatsGrid(pending, approved, rejected, cancelled, l10n),
                         const SizedBox(height: 32),
-                        _buildSectionTitle('Upcoming Reservations'),
+                        _buildSectionTitle(l10n.get('upcomingReservations')),
                         const SizedBox(height: 16),
-                        _buildUpcomingReservationsSection(upcomingDocs),
+                        _buildUpcomingReservationsSection(upcomingDocs, l10n),
                         const SizedBox(height: 32),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            _buildSectionTitle('Recent Activity'),
+                            _buildSectionTitle(l10n.get('recentActivity')),
                             TextButton(
-                              onPressed: () => _showAllTodayActivity(context, allRecentActivities),
+                              onPressed: () => _showAllTodayActivity(context, allRecentActivities, l10n),
                               style: TextButton.styleFrom(
                                 foregroundColor: const Color(0xFF2563EB),
                                 padding: EdgeInsets.zero,
                                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                               ),
-                              child: const Text('See All', style: TextStyle(fontWeight: FontWeight.w600)),
+                              child: Text(l10n.get('seeAll'), style: const TextStyle(fontWeight: FontWeight.w600)),
                             ),
                           ],
                         ),
                         const SizedBox(height: 16),
-                        _buildRecentActivityList(displayActivities),
+                        _buildRecentActivityList(displayActivities, l10n),
                       ],
                     );
                   },
@@ -162,7 +172,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  void _showAllTodayActivity(BuildContext context, List<QueryDocumentSnapshot> allActivities) {
+  void _showAllTodayActivity(BuildContext context, List<QueryDocumentSnapshot> allActivities, AppLocalizations l10n) {
     final now = DateTime.now();
     final todayStart = DateTime(now.year, now.month, now.day);
     
@@ -204,19 +214,19 @@ class _HomePageState extends State<HomePage> {
                       ),
                     ),
                     const SizedBox(height: 24),
-                    const Text(
-                      "Today's Activity",
-                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                    Text(
+                      l10n.get('todaysActivity'),
+                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 16),
                     Expanded(
                       child: todayActivities.isEmpty
-                          ? const Center(child: Text("No activity recorded today", style: TextStyle(color: Colors.grey)))
+                          ? Center(child: Text(l10n.get('noActivityToday'), style: const TextStyle(color: Colors.grey)))
                           : ListView.builder(
                               controller: scrollController,
                               itemCount: todayActivities.length,
                               itemBuilder: (context, index) {
-                                return _RecentActivityItem(doc: todayActivities[index]);
+                                return _RecentActivityItem(doc: todayActivities[index], l10n: l10n);
                               },
                             ),
                     ),
@@ -230,7 +240,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildNoOrgUI(String displayName, User user) {
+  Widget _buildNoOrgUI(String displayName, User user, AppLocalizations l10n) {
     return Scaffold(
       body: SafeArea(
         child: Padding(
@@ -238,13 +248,13 @@ class _HomePageState extends State<HomePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildHeader(displayName, user),
+              _buildHeader(displayName, user, l10n),
               const Spacer(),
-              const Center(
+              Center(
                 child: Text(
-                  "No organization selected.\nPlease update your profile to see data.",
+                  l10n.get('noOrgSelectedHome'),
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey, fontSize: 16),
+                  style: const TextStyle(color: Colors.grey, fontSize: 16),
                 ),
               ),
               const Spacer(),
@@ -255,7 +265,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildHeader(String displayName, User? user) {
+  Widget _buildHeader(String displayName, User? user, AppLocalizations l10n) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -264,7 +274,7 @@ class _HomePageState extends State<HomePage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              _getFormattedDate().toUpperCase(),
+              _getFormattedDate(context).toUpperCase(),
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
@@ -275,9 +285,9 @@ class _HomePageState extends State<HomePage> {
             const SizedBox(height: 8),
             RichText(
               text: TextSpan(
-                text: 'Hello, ',
+                text: l10n.get('hello'),
                 style: TextStyle(
-                  fontSize: 26,
+                  fontSize: 20,
                   color: Colors.grey.shade800,
                 ),
                 children: [
@@ -288,6 +298,14 @@ class _HomePageState extends State<HomePage> {
                       color: Colors.black,
                     ),
                   ),
+                  if (Localizations.localeOf(context).languageCode == 'ja')
+                    TextSpan(
+                      text: l10n.get('student'),
+                      style: TextStyle(
+                        fontSize: 20,
+                        color: Colors.grey.shade800,
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -321,12 +339,12 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildStatsGrid(int pending, int approved, int rejected, int cancelled) {
+  Widget _buildStatsGrid(int pending, int approved, int rejected, int cancelled, AppLocalizations l10n) {
     return Row(
       children: [
         Expanded(
           child: _StatCard(
-            title: 'Pending',
+            title: l10n.get('pending'),
             count: pending.toString(),
             color: Colors.orange,
             icon: Icons.hourglass_top_rounded,
@@ -335,7 +353,7 @@ class _HomePageState extends State<HomePage> {
         const SizedBox(width: 8),
         Expanded(
           child: _StatCard(
-            title: 'Approved',
+            title: l10n.get('approved'),
             count: approved.toString(),
             color: Colors.green,
             icon: Icons.check_circle_outline_rounded,
@@ -344,7 +362,7 @@ class _HomePageState extends State<HomePage> {
         const SizedBox(width: 8),
         Expanded(
           child: _StatCard(
-            title: 'Rejected',
+            title: l10n.get('rejected'),
             count: rejected.toString(),
             color: Colors.red,
             icon: Icons.remove_circle_outline_rounded,
@@ -353,7 +371,7 @@ class _HomePageState extends State<HomePage> {
         const SizedBox(width: 8),
         Expanded(
           child: _StatCard(
-            title: 'Cancelled',
+            title: l10n.get('cancelled'),
             count: cancelled.toString(),
             color: Colors.grey,
             icon: Icons.cancel_outlined,
@@ -374,7 +392,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildUpcomingReservationsSection(List<QueryDocumentSnapshot> docs) {
+  Widget _buildUpcomingReservationsSection(List<QueryDocumentSnapshot> docs, AppLocalizations l10n) {
     if (docs.isEmpty) {
       return Container(
         width: double.infinity,
@@ -384,8 +402,8 @@ class _HomePageState extends State<HomePage> {
           borderRadius: BorderRadius.circular(24),
           border: Border.all(color: Colors.grey.shade200),
         ),
-        child: const Center(
-          child: Text("No upcoming approved reservations", style: TextStyle(color: Colors.grey)),
+        child: Center(
+          child: Text(l10n.get('noUpcomingApproved'), style: const TextStyle(color: Colors.grey)),
         ),
       );
     }
@@ -395,17 +413,17 @@ class _HomePageState extends State<HomePage> {
         children: [
           Row(
             children: [
-              Expanded(child: _buildUpcomingReservationCard(docs[0])),
+              Expanded(child: _buildUpcomingReservationCard(docs[0], l10n, index: 0)),
               const SizedBox(width: 12),
-              Expanded(child: _buildUpcomingReservationCard(docs[1])),
+              Expanded(child: _buildUpcomingReservationCard(docs[1], l10n, index: 1)),
             ],
           ),
           const SizedBox(height: 12),
           Row(
             children: [
-              Expanded(child: _buildUpcomingReservationCard(docs[2])),
+              Expanded(child: _buildUpcomingReservationCard(docs[2], l10n, index: 2)),
               const SizedBox(width: 12),
-              Expanded(child: _buildUpcomingReservationCard(docs[3])),
+              Expanded(child: _buildUpcomingReservationCard(docs[3], l10n, index: 3)),
             ],
           ),
         ],
@@ -415,152 +433,189 @@ class _HomePageState extends State<HomePage> {
         children: [
           Row(
             children: [
-              Expanded(child: _buildUpcomingReservationCard(docs[0])),
+              Expanded(child: _buildUpcomingReservationCard(docs[0], l10n, index: 0)),
               const SizedBox(width: 12),
-              Expanded(child: _buildUpcomingReservationCard(docs[1])),
+              Expanded(child: _buildUpcomingReservationCard(docs[1], l10n, index: 1)),
             ],
           ),
           const SizedBox(height: 12),
-          _buildUpcomingReservationCard(docs[2]),
+          _buildUpcomingReservationCard(docs[2], l10n, index: 2),
         ],
       );
     } else {
       return Column(
-        children: docs.map((doc) => Padding(
+        children: List.generate(docs.length, (i) => Padding(
           padding: const EdgeInsets.only(bottom: 12.0),
-          child: _buildUpcomingReservationCard(doc),
-        )).toList(),
+          child: _buildUpcomingReservationCard(docs[i], l10n, index: i),
+        )),
       );
     }
   }
 
-  Widget _buildUpcomingReservationCard(QueryDocumentSnapshot doc) {
+  Widget _buildUpcomingReservationCard(QueryDocumentSnapshot doc, AppLocalizations l10n, {int index = 0}) {
     final data = doc.data() as Map<String, dynamic>;
     final startTime = (data['startTime'] as Timestamp).toDate();
     final endTime = (data['endTime'] as Timestamp).toDate();
+    final locale = Localizations.localeOf(context).toString();
+
+    // Define Color Variants
+    final gradients = [
+      [const Color(0xFF2563EB), const Color(0xFF1D4ED8)], // Royal Blue
+      [const Color(0xFF6366F1), const Color(0xFF4F46E5)], // Indigo
+      [const Color(0xFF0D9488), const Color(0xFF0F766E)], // Teal
+      [const Color(0xFF059669), const Color(0xFF047857)], // Emerald
+    ];
+    
+    final selectedGradient = gradients[index % gradients.length];
+    final baseColor = selectedGradient[0];
 
     return LayoutBuilder(
       builder: (context, constraints) {
         final bool isSmall = constraints.maxWidth < 200;
         
-        return Container(
-          width: double.infinity,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF2563EB), Color(0xFF1D4ED8)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF2563EB).withValues(alpha: 0.3),
-                blurRadius: 15,
-                offset: const Offset(0, 8),
+        // Dynamic decorative configurations based on isSmall
+        final decorations = [
+          // Variant 0
+          [
+            Positioned(top: isSmall ? -15 : -20, right: isSmall ? -15 : -20, child: _CircularDecoration(size: isSmall ? 70 : 140, alpha: 0.1)),
+            Positioned(bottom: isSmall ? -20 : -30, left: isSmall ? -10 : -10, child: _CircularDecoration(size: isSmall ? 50 : 100, alpha: 0.05)),
+          ],
+          // Variant 1
+          [
+            Positioned(top: isSmall ? -20 : -30, left: isSmall ? -15 : -20, child: _CircularDecoration(size: isSmall ? 60 : 120, alpha: 0.08)),
+            Positioned(bottom: isSmall ? -15 : -20, right: isSmall ? -10 : -10, child: _CircularDecoration(size: isSmall ? 75 : 150, alpha: 0.06)),
+          ],
+          // Variant 2
+          [
+            Positioned(top: isSmall ? -25 : -40, left: isSmall ? 10 : 20, child: _CircularDecoration(size: isSmall ? 45 : 90, alpha: 0.07)),
+            Positioned(bottom: isSmall ? 5 : 10, right: isSmall ? -25 : -40, child: _CircularDecoration(size: isSmall ? 80 : 160, alpha: 0.09)),
+          ],
+          // Variant 3
+          [
+            Positioned(top: isSmall ? -35 : -60, left: isSmall ? 20 : 40, child: _CircularDecoration(size: isSmall ? 65 : 130, alpha: 0.1)),
+            Positioned(bottom: isSmall ? -25 : -40, left: isSmall ? -15 : -20, child: _CircularDecoration(size: isSmall ? 55 : 110, alpha: 0.05)),
+          ],
+        ];
+
+        final selectedDecoration = decorations[index % decorations.length];
+
+        return GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => BookedDetailsPage(booking: Booking.fromFirestore(doc)),
               ),
-            ],
-          ),
-          child: Stack(
-            children: [
-              Positioned(
-                top: -10,
-                right: -10,
-                child: Container(
-                  width: isSmall ? 80 : 120,
-                  height: isSmall ? 80 : 120,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white.withValues(alpha: 0.08),
-                  ),
+            );
+          },
+          child: Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: selectedGradient,
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: baseColor.withValues(alpha: 0.3),
+                  blurRadius: 15,
+                  offset: const Offset(0, 8),
                 ),
-              ),
-              Padding(
-                padding: EdgeInsets.all(isSmall ? 16.0 : 20.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            _capitalize(data['status']),
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                              fontSize: isSmall ? 10 : 11,
+              ],
+            ),
+            child: Stack(
+              children: [
+                ...selectedDecoration,
+                Padding(
+                  padding: EdgeInsets.all(isSmall ? 16.0 : 20.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              l10n.get(data['status'].toString().toLowerCase()),
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                                fontSize: isSmall ? 10 : 11,
+                              ),
                             ),
                           ),
+                          if (!isSmall) const Icon(Icons.more_horiz, color: Colors.white70, size: 18),
+                        ],
+                      ),
+                      SizedBox(height: isSmall ? 12 : 16),
+                      Text(
+                        data['purpose'] ?? l10n.get('noPurpose'),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: isSmall ? 16 : 18,
+                          fontWeight: FontWeight.bold,
+                          height: 1.1,
                         ),
-                        if (!isSmall) const Icon(Icons.more_horiz, color: Colors.white70, size: 18),
-                      ],
-                    ),
-                    SizedBox(height: isSmall ? 12 : 16),
-                    Text(
-                      data['purpose'] ?? 'No Purpose',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: isSmall ? 16 : 18,
-                        fontWeight: FontWeight.bold,
-                        height: 1.1,
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${data['roomName']} • ${data['floor']}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: isSmall ? 12 : 13,
+                      const SizedBox(height: 4),
+                      Text(
+                        '${data['roomName']} • ${_getLocalizedFloor(data['floor'] ?? '', l10n)}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: isSmall ? 12 : 13,
+                        ),
                       ),
-                    ),
-                    SizedBox(height: isSmall ? 12 : 16),
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
+                      SizedBox(height: isSmall ? 12 : 16),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: isSmall 
+                          ? Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildWhiteIconInfo(Icons.calendar_today, DateFormat('MMM d', locale).format(startTime), size: 11),
+                                const SizedBox(height: 4),
+                                _buildWhiteIconInfo(Icons.access_time, DateFormat('hh:mm a', locale).format(startTime), size: 11),
+                              ],
+                            )
+                          : Row(
+                              children: [
+                                _buildWhiteIconInfo(Icons.calendar_today, DateFormat('MMM d', locale).format(startTime)),
+                                const SizedBox(width: 12),
+                                _buildWhiteIconInfo(Icons.access_time, '${DateFormat('hh:mm a', locale).format(startTime)} - ${DateFormat('hh:mm a', locale).format(endTime)}'),
+                              ],
+                            ),
                       ),
-                      child: isSmall 
-                        ? Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildWhiteIconInfo(Icons.calendar_today, DateFormat('MMM d').format(startTime), size: 11),
-                              const SizedBox(height: 4),
-                              _buildWhiteIconInfo(Icons.access_time, '${DateFormat('HH:mm').format(startTime)}', size: 11),
-                            ],
-                          )
-                        : Row(
-                            children: [
-                              _buildWhiteIconInfo(Icons.calendar_today, DateFormat('MMM d').format(startTime)),
-                              const SizedBox(width: 12),
-                              _buildWhiteIconInfo(Icons.access_time, '${DateFormat('HH:mm').format(startTime)} - ${DateFormat('HH:mm').format(endTime)}'),
-                            ],
-                          ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       }
     );
   }
 
-  Widget _buildRecentActivityList(List<QueryDocumentSnapshot> activities) {
+  Widget _buildRecentActivityList(List<QueryDocumentSnapshot> activities, AppLocalizations l10n) {
     if (activities.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 32.0),
-        child: Center(child: Text("No recent activity", style: TextStyle(color: Colors.grey))),
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 32.0),
+        child: Center(child: Text(l10n.get('noRecentActivity'), style: const TextStyle(color: Colors.grey))),
       );
     }
     return ListView.builder(
@@ -568,7 +623,7 @@ class _HomePageState extends State<HomePage> {
       physics: const NeverScrollableScrollPhysics(),
       itemCount: activities.length,
       itemBuilder: (context, index) {
-        return _RecentActivityItem(doc: activities[index]);
+        return _RecentActivityItem(doc: activities[index], l10n: l10n);
       },
     );
   }
@@ -640,14 +695,15 @@ class _StatCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 4),
-          Text(
-            title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 11,
-              color: color.withValues(alpha: 0.8),
-              fontWeight: FontWeight.w600,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              title,
+              style: TextStyle(
+                fontSize: 11,
+                color: color.withValues(alpha: 0.8),
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ],
@@ -658,19 +714,15 @@ class _StatCard extends StatelessWidget {
 
 class _RecentActivityItem extends StatelessWidget {
   final QueryDocumentSnapshot doc;
+  final AppLocalizations l10n;
 
-  const _RecentActivityItem({required this.doc});
+  const _RecentActivityItem({required this.doc, required this.l10n});
 
   String _getTimeAgo(DateTime dateTime) {
     final diff = DateTime.now().difference(dateTime);
-    if (diff.inMinutes < 60) return '${diff.inMinutes} mins ago';
-    if (diff.inHours < 24) return '${diff.inHours} hrs ago';
-    return '${diff.inDays} days ago';
-  }
-
-  String _capitalize(String text) {
-    if (text.isEmpty) return text;
-    return text[0].toUpperCase() + text.substring(1).toLowerCase();
+    if (diff.inMinutes < 60) return '${diff.inMinutes} ${l10n.get('minsAgo')}';
+    if (diff.inHours < 24) return '${diff.inHours} ${l10n.get('hrsAgo')}';
+    return '${diff.inDays} ${l10n.get('daysAgo')}';
   }
 
   @override
@@ -679,82 +731,131 @@ class _RecentActivityItem extends StatelessWidget {
     final status = (data['status'] as String).toLowerCase();
     final createdAt = (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now();
     
-    String title = 'Reservation ${_capitalize(status)}';
+    String title = '${l10n.get('reservationStatus')} ${l10n.get(status)}';
     IconData icon = Icons.info_outline;
     Color color = Colors.blue;
 
     if (status == 'pending') {
-      title = 'New Reservation';
+      title = l10n.get('newReservation');
       icon = Icons.add_rounded;
       color = Colors.blue;
     } else if (status == 'approved') {
-      title = 'Booking Approved';
+      title = l10n.get('bookingApproved');
       icon = Icons.check_rounded;
       color = Colors.green;
     } else if (status == 'rejected') {
-      title = 'Booking Rejected';
+      title = l10n.get('bookingRejected');
       icon = Icons.close_rounded;
       color = Colors.red;
     } else if (status == 'cancelled') {
-      title = 'Booking Cancelled';
+      title = l10n.get('bookingCancelled');
       icon = Icons.cancel_rounded;
       color = Colors.grey;
+    } else if (status == 'completed') {
+      title = l10n.get('bookingCompleted');
+      icon = Icons.done_all_rounded;
+      color = Colors.blueGrey;
     }
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: color, size: 22),
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => BookedDetailsPage(booking: Booking.fromFirestore(doc)),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                        fontSize: 15,
+        );
+      },
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: color, size: 22),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                            fontSize: 15,
+                          ),
+                        ),
                       ),
-                    ),
-                    Text(
-                      _getTimeAgo(createdAt),
-                      style: TextStyle(
-                          color: Colors.grey.shade400,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500
+                      const SizedBox(width: 8),
+                      Text(
+                        _getTimeAgo(createdAt),
+                        style: TextStyle(
+                            color: Colors.grey.shade400,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${data['roomName']} • ${data['purpose']}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: Colors.grey.shade600,
-                    fontSize: 13,
-                    height: 1.3,
+                    ],
                   ),
-                ),
-              ],
+                  const SizedBox(height: 4),
+                  Text(
+                    '${data['roomName']} • ${_getLocalizedFloorRecent(data['floor'] ?? '', l10n)} • ${data['purpose'] ?? l10n.get('noPurpose')}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                      fontSize: 13,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _getLocalizedFloorRecent(String floor, AppLocalizations l10n) {
+    String f = floor.toLowerCase().replaceAll(' ', '');
+    if (f.contains('ground')) return l10n.get('groundFloor');
+    if (f.contains('1st')) return l10n.get('1stFloor');
+    if (f.contains('2nd')) return l10n.get('2ndFloor');
+    if (f.contains('3rd')) return l10n.get('3rdFloor');
+    if (f.contains('4th')) return l10n.get('4thFloor');
+    return floor;
+  }
+}
+
+class _CircularDecoration extends StatelessWidget {
+  final double size;
+  final double alpha;
+
+  const _CircularDecoration({required this.size, required this.alpha});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.white.withValues(alpha: alpha),
       ),
     );
   }
