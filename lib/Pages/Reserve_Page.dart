@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../l10n/app_localizations.dart';
 import 'Rooms_Page.dart'; // For Room model
 
@@ -24,42 +26,48 @@ class _ReservePageState extends State<ReservePage> {
   void initState() {
     super.initState();
     // 1. Initialize Date: Find first valid date
-    final List<int> allowedDays = (widget.room.availability['daysOfWeek'] as List<dynamic>?)?.cast<int>() ?? [];
+    final List<int> allowedDays = (widget.room
+        .availability['daysOfWeek'] as List<dynamic>?)?.cast<int>() ?? [];
     _selectedDate = _getInitialDate(allowedDays);
 
     // 2. Initialize Time: Check against min/max
     final startStr = widget.room.availability['startTime'] as String?;
     final minTime = _parseTime(startStr);
-    
+
     // Default to current time or minTime if current is too early
     TimeOfDay initialTime = TimeOfDay.now();
     if (minTime != null) {
-       double currentDouble = initialTime.hour + initialTime.minute / 60.0;
-       double minDouble = minTime.hour + minTime.minute / 60.0;
-       if (currentDouble < minDouble) {
-         initialTime = minTime;
-       }
+      double currentDouble = initialTime.hour + initialTime.minute / 60.0;
+      double minDouble = minTime.hour + minTime.minute / 60.0;
+      if (currentDouble < minDouble) {
+        initialTime = minTime;
+      }
     }
     _startTime = initialTime;
-    
+
     // Default duration setup
-    final minDuration = (widget.room.bookingRules['minDurationMinutes'] as int?) ?? 30;
+    final minDuration = (widget.room
+        .bookingRules['minDurationMinutes'] as int?) ?? 30;
     _durationMinutes = minDuration > 0 ? minDuration : 30;
   }
 
   bool _isTimeValid(TimeOfDay time) {
-      final startStr = widget.room.availability['startTime'] as String?;
-      final endStr = widget.room.availability['endTime'] as String?;
-      final minTime = _parseTime(startStr);
-      final maxTime = _parseTime(endStr);
-      
-      double pickedDouble = time.hour + time.minute / 60.0;
-      double? minDouble = minTime != null ? minTime.hour + minTime.minute / 60.0 : null;
-      double? maxDouble = maxTime != null ? maxTime.hour + maxTime.minute / 60.0 : null;
+    final startStr = widget.room.availability['startTime'] as String?;
+    final endStr = widget.room.availability['endTime'] as String?;
+    final minTime = _parseTime(startStr);
+    final maxTime = _parseTime(endStr);
 
-      if (minDouble != null && pickedDouble < minDouble) return false;
-      if (maxDouble != null && pickedDouble > maxDouble) return false;
-      return true;
+    double pickedDouble = time.hour + time.minute / 60.0;
+    double? minDouble = minTime != null
+        ? minTime.hour + minTime.minute / 60.0
+        : null;
+    double? maxDouble = maxTime != null
+        ? maxTime.hour + maxTime.minute / 60.0
+        : null;
+
+    if (minDouble != null && pickedDouble < minDouble) return false;
+    if (maxDouble != null && pickedDouble > maxDouble) return false;
+    return true;
   }
 
   // ... (dispose, _formatDuration, _parseTime, _getInitialDate remain same)
@@ -108,21 +116,23 @@ class _ReservePageState extends State<ReservePage> {
   }
 
   Future<void> _selectDate(BuildContext context) async {
-    final int advanceDays = (widget.room.bookingRules['advanceBookingDays'] as int?) ?? 365;
+    final int advanceDays = (widget.room
+        .bookingRules['advanceBookingDays'] as int?) ?? 365;
     final DateTime lastDate = DateTime.now().add(Duration(days: advanceDays));
-    final List<int> allowedDays = (widget.room.availability['daysOfWeek'] as List<dynamic>?)?.cast<int>() ?? [];
+    final List<int> allowedDays = (widget.room
+        .availability['daysOfWeek'] as List<dynamic>?)?.cast<int>() ?? [];
 
     DateTime initialDate = _selectedDate;
     // Check if current _selectedDate is valid (it should be from init, but good to be safe)
     if (allowedDays.isNotEmpty && !allowedDays.contains(initialDate.weekday)) {
-       initialDate = _getInitialDate(allowedDays);
+      initialDate = _getInitialDate(allowedDays);
     }
-    
+
     // Ensure initialDate is within range
     if (initialDate.isAfter(lastDate)) {
-       initialDate = lastDate; 
+      initialDate = lastDate;
     } else if (initialDate.isBefore(DateTime.now())) {
-       initialDate = DateTime.now();
+      initialDate = DateTime.now();
     }
 
     final DateTime? picked = await showDatePicker(
@@ -147,7 +157,7 @@ class _ReservePageState extends State<ReservePage> {
       context: context,
       initialTime: _startTime,
     );
-    
+
     if (picked != null) {
       setState(() {
         _startTime = picked;
@@ -156,24 +166,29 @@ class _ReservePageState extends State<ReservePage> {
     }
   }
 
-  void _submitReservation() {
+  Future<void> _submitReservation() async {
     if (_formKey.currentState!.validate()) {
       // Final availability check
       if (!_isTimeValid(_startTime)) {
-          final startStr = widget.room.availability['startTime'] as String? ?? 'N/A';
-          final endStr = widget.room.availability['endTime'] as String? ?? 'N/A';
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Selected time is outside availability ($startStr - $endStr)')),
-          );
-          return;
+        final startStr = widget.room.availability['startTime'] as String? ??
+            'N/A';
+        final endStr = widget.room.availability['endTime'] as String? ?? 'N/A';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(
+              'Selected time is outside availability ($startStr - $endStr)')),
+        );
+        return;
       }
-      
-      final List<int> allowedDays = (widget.room.availability['daysOfWeek'] as List<dynamic>?)?.cast<int>() ?? [];
-      if (allowedDays.isNotEmpty && !allowedDays.contains(_selectedDate.weekday)) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Selected date is not available for this room')),
-          );
-          return;
+
+      final List<int> allowedDays = (widget.room
+          .availability['daysOfWeek'] as List<dynamic>?)?.cast<int>() ?? [];
+      if (allowedDays.isNotEmpty &&
+          !allowedDays.contains(_selectedDate.weekday)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Selected date is not available for this room')),
+        );
+        return;
       }
 
       // Calculate End Time
@@ -184,62 +199,193 @@ class _ReservePageState extends State<ReservePage> {
         _startTime.hour,
         _startTime.minute,
       );
-      final endDateTime = startDateTime.add(Duration(minutes: _durationMinutes));
-      
+      final endDateTime = startDateTime.add(
+          Duration(minutes: _durationMinutes));
+
       // Determine Status
-      final bool requiresApproval = widget.room.bookingRules['requiresApproval'] == true;
+      final bool requiresApproval = widget.room
+          .bookingRules['requiresApproval'] == true;
       final String status = requiresApproval ? 'Pending' : 'Approved';
+
+      // Fetch User Details
+      String userName = 'Unknown';
+      String organization = 'None';
+      String createdAt = 'N/A';
+      String updatedAt = 'N/A';
+
+      try {
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          final userDoc = await FirebaseFirestore.instance.collection('users')
+              .doc(user.uid)
+              .get();
+          if (userDoc.exists) {
+            final data = userDoc.data()!;
+            userName = data['name'] ?? user.displayName ?? 'Unknown';
+            organization = data['organizationName'] ?? 'None';
+            createdAt =
+                (data['createdAt'] as Timestamp?)?.toDate().toString() ?? 'N/A';
+            updatedAt =
+                (data['updatedAt'] as Timestamp?)?.toDate().toString() ?? 'N/A';
+          }
+        }
+      } catch (e) {
+        debugPrint('Error fetching user details: $e');
+      }
 
       // Log details
       debugPrint('--- Reservation Details ---');
       debugPrint('Room: ${widget.room.name}');
+      debugPrint('Building: ${widget.room.building}');
+      debugPrint('Floor: ${widget.room.floor}');
       debugPrint('Date: ${DateFormat('yyyy-MM-dd').format(_selectedDate)}');
       debugPrint('Start Time: ${_startTime.format(context)}');
       debugPrint('Duration: $_durationMinutes minutes');
       debugPrint('End Time: ${DateFormat('HH:mm').format(endDateTime)}');
       debugPrint('Purpose: ${_purposeController.text}');
       debugPrint('Status: $status');
+      debugPrint('User: $userName');
+      debugPrint('Organization: $organization');
+      debugPrint('User CreatedAt: $createdAt');
+      debugPrint('User UpdatedAt: $updatedAt');
       debugPrint('---------------------------');
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Reservation Confirmed (Logged to Console)')),
-      );
-      
-      // Navigate back or to a success page
-      Navigator.pop(context); 
+      // Check for overlapping reservations
+      try {
+        final startOfDay = DateTime(
+            startDateTime.year, startDateTime.month, startDateTime.day);
+        final endOfDay = DateTime(
+            startDateTime.year, startDateTime.month, startDateTime.day, 23, 59,
+            59);
+
+        // Query only by roomId to avoid composite index requirement
+        final existingBookings = await FirebaseFirestore.instance
+            .collection('bookings')
+            .where('roomId', isEqualTo: widget.room.id)
+            .get();
+
+        for (var doc in existingBookings.docs) {
+          final data = doc.data();
+          if (data['status'] == 'cancelled' || data['status'] == 'rejected')
+            continue;
+
+          final existingStart = (data['startTime'] as Timestamp).toDate();
+          final existingEnd = (data['endTime'] as Timestamp).toDate();
+
+          // Filter by date first (client-side)
+          if (existingStart.isBefore(startOfDay) ||
+              existingStart.isAfter(endOfDay)) {
+            // If multi-day bookings are allowed, this logic needs to be more complex.
+            // Assuming single-day bookings for now based on current UI.
+            // If not, we just check overlap directly.
+            // Let's just check overlap directly for robustness against any date.
+          }
+
+          // Overlap check: (StartA < EndB) && (EndA > StartB)
+          // Use isBefore/isAfter logic strictly.
+          // Note: isBefore is exclusive. 9:00 is not before 9:00.
+          // New: 9:01 - 10:00. Existing: 7:30 - 9:00.
+          // StartA (9:01) < EndB (9:00) -> False. No overlap.
+          // New: 9:00 - 10:00. Existing: 7:30 - 9:00.
+          // StartA (9:00) < EndB (9:00) -> False. No overlap.
+
+          if (startDateTime.isBefore(existingEnd) &&
+              endDateTime.isAfter(existingStart)) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                    content: Text('Room already reserved for this time')),
+              );
+            }
+            return;
+          }
+        }
+      } catch (e) {
+        debugPrint('Error checking overlaps: $e');
+        // Optionally handle error, maybe proceed or block. Blocking is safer.
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error checking availability: $e')),
+          );
+        }
+        return;
+      }
+
+      // Insert into Firestore
+      try {
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          await FirebaseFirestore.instance.collection('bookings').add({
+            'roomId': widget.room.id,
+            'roomName': widget.room.name,
+            'building': widget.room.building,
+            'floor': widget.room.floor,
+            'userId': user.uid,
+            'userName': userName,
+            'organizationName': organization,
+            'startTime': Timestamp.fromDate(startDateTime),
+            'endTime': Timestamp.fromDate(endDateTime),
+            'durationMinutes': _durationMinutes,
+            'purpose': _purposeController.text,
+            'status': status,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+        }
+      } catch (e) {
+        debugPrint('Error inserting booking: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to book room: $e')),
+          );
+        }
+        return; // Don't close page if failed
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Reservation Confirmed')),
+        );
+        Navigator.pop(context);
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final colorScheme = Theme.of(context).colorScheme;
-    
+    final colorScheme = Theme
+        .of(context)
+        .colorScheme;
+
     // Build duration items
-    final int maxDuration = (widget.room.bookingRules['maxDurationMinutes'] as int?) ?? 1440;
+    final int maxDuration = (widget.room
+        .bookingRules['maxDurationMinutes'] as int?) ?? 1440;
     final List<int> durationOptions = [15, 30, 45, 60, 90, 120, 180, 240, 480]
         .where((d) => d <= maxDuration)
         .toList();
-        
+
     if (!durationOptions.contains(_durationMinutes)) {
       if (_durationMinutes <= maxDuration) {
         durationOptions.add(_durationMinutes);
         durationOptions.sort();
       } else {
-         // Fallback if current duration exceeds max (shouldn't happen with init logic but safe)
-         _durationMinutes = durationOptions.isNotEmpty ? durationOptions.last : maxDuration;
-         if (!durationOptions.contains(_durationMinutes)) {
-            durationOptions.add(_durationMinutes);
-         }
+        // Fallback if current duration exceeds max (shouldn't happen with init logic but safe)
+        _durationMinutes =
+        durationOptions.isNotEmpty ? durationOptions.last : maxDuration;
+        if (!durationOptions.contains(_durationMinutes)) {
+          durationOptions.add(_durationMinutes);
+        }
       }
     }
 
     // Advance Booking Info
-    final int advanceDays = (widget.room.bookingRules['advanceBookingDays'] as int?) ?? 0;
+    final int advanceDays = (widget.room
+        .bookingRules['advanceBookingDays'] as int?) ?? 0;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Reserve Room'), 
+        title: const Text('Reserve Room'),
+        centerTitle: true,
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         elevation: 0,
@@ -260,7 +406,8 @@ class _ReservePageState extends State<ReservePage> {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.meeting_room, color: colorScheme.primary, size: 40),
+                    Icon(Icons.meeting_room, color: colorScheme.primary,
+                        size: 40),
                     const SizedBox(width: 16),
                     Expanded(
                       child: Column(
@@ -288,7 +435,10 @@ class _ReservePageState extends State<ReservePage> {
               const SizedBox(height: 24),
 
               // Date Picker
-              Text('Date', style: Theme.of(context).textTheme.titleMedium),
+              Text('Date', style: Theme
+                  .of(context)
+                  .textTheme
+                  .titleMedium),
               const SizedBox(height: 8),
               InkWell(
                 onTap: () => _selectDate(context),
@@ -303,7 +453,10 @@ class _ReservePageState extends State<ReservePage> {
               const SizedBox(height: 20),
 
               // Time Picker
-              Text('Start Time', style: Theme.of(context).textTheme.titleMedium),
+              Text('Start Time', style: Theme
+                  .of(context)
+                  .textTheme
+                  .titleMedium),
               const SizedBox(height: 8),
               InkWell(
                 onTap: () => _selectTime(context),
@@ -311,7 +464,9 @@ class _ReservePageState extends State<ReservePage> {
                   decoration: InputDecoration(
                     border: const OutlineInputBorder(),
                     suffixIcon: const Icon(Icons.access_time),
-                    errorText: _timeError ? 'Available: ${widget.room.availability['startTime'] ?? 'N/A'} - ${widget.room.availability['endTime'] ?? 'N/A'}' : null,
+                    errorText: _timeError ? 'Available: ${widget.room
+                        .availability['startTime'] ?? 'N/A'} - ${widget.room
+                        .availability['endTime'] ?? 'N/A'}' : null,
                   ),
                   child: Text(_startTime.format(context)),
                 ),
@@ -319,7 +474,10 @@ class _ReservePageState extends State<ReservePage> {
               const SizedBox(height: 20),
 
               // Duration
-              Text('Duration', style: Theme.of(context).textTheme.titleMedium),
+              Text('Duration', style: Theme
+                  .of(context)
+                  .textTheme
+                  .titleMedium),
               const SizedBox(height: 8),
               DropdownButtonFormField<int>(
                 value: _durationMinutes,
@@ -338,17 +496,24 @@ class _ReservePageState extends State<ReservePage> {
                   });
                 },
                 validator: (value) {
-                   final min = widget.room.bookingRules['minDurationMinutes'] as int? ?? 0;
-                   final max = widget.room.bookingRules['maxDurationMinutes'] as int? ?? 1440;
-                   if (value! < min && min > 0) return 'Minimum duration is ${_formatDuration(min)}';
-                   if (value > max && max > 0) return 'Maximum duration is ${_formatDuration(max)}';
-                   return null;
+                  final min = widget.room
+                      .bookingRules['minDurationMinutes'] as int? ?? 0;
+                  final max = widget.room
+                      .bookingRules['maxDurationMinutes'] as int? ?? 1440;
+                  if (value! < min && min > 0)
+                    return 'Minimum duration is ${_formatDuration(min)}';
+                  if (value > max && max > 0)
+                    return 'Maximum duration is ${_formatDuration(max)}';
+                  return null;
                 },
               ),
               const SizedBox(height: 20),
 
               // Purpose
-              Text('Purpose', style: Theme.of(context).textTheme.titleMedium),
+              Text('Purpose', style: Theme
+                  .of(context)
+                  .textTheme
+                  .titleMedium),
               const SizedBox(height: 8),
               TextFormField(
                 controller: _purposeController,
@@ -380,17 +545,140 @@ class _ReservePageState extends State<ReservePage> {
                   child: const Text(
                     'Confirm Reservation',
                     style: TextStyle(
-                      fontSize: 16, 
-                      fontWeight: FontWeight.bold, 
-                      color: Colors.white
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white
                     ),
                   ),
                 ),
               ),
+
+              const SizedBox(height: 32),
+
+              // Existing Reservations List
+              const Text(
+                'Existing Reservations',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+              _buildExistingReservationsList(),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildExistingReservationsList() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('bookings')
+          .where('roomId', isEqualTo: widget.room.id)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return const Text('Error loading reservations');
+        }
+
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final docs = snapshot.data?.docs ?? [];
+
+        // Filter and sort client-side to avoid index issues
+        final now = DateTime.now();
+        final validBookings = docs.where((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          if (data['status'] == 'cancelled' || data['status'] == 'rejected')
+            return false;
+
+          final endTimestamp = data['endTime'] as Timestamp?;
+          if (endTimestamp == null) return false;
+
+          return endTimestamp.toDate().isAfter(
+              now); // Only show upcoming/ongoing
+        }).toList();
+
+        // Sort by start time
+        validBookings.sort((a, b) {
+          final startA = (a['startTime'] as Timestamp).toDate();
+          final startB = (b['startTime'] as Timestamp).toDate();
+          return startA.compareTo(startB);
+        });
+
+        if (validBookings.isEmpty) {
+          return const Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Text(
+              'No upcoming reservations found.',
+              style: TextStyle(color: Colors.grey),
+            ),
+          );
+        }
+
+        return ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: validBookings.length,
+          itemBuilder: (context, index) {
+            final data = validBookings[index].data() as Map<String, dynamic>;
+            final start = (data['startTime'] as Timestamp).toDate();
+            final end = (data['endTime'] as Timestamp).toDate();
+            final purpose = data['purpose'] ?? 'Reserved';
+            final userName = data['userName'] ?? 'Unknown User';
+
+            return Card(
+              margin: const EdgeInsets.only(bottom: 12),
+              elevation: 0,
+              color: Colors.grey.shade100,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              child: ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  child: const Icon(
+                      Icons.event_seat, size: 20, color: Colors.blueGrey),
+                ),
+                title: Text(
+                  purpose,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w600, fontSize: 15),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 4),
+                    Text(
+                      '${DateFormat('MMM d').format(start)} • ${DateFormat(
+                          'h:mm a').format(start)} - ${DateFormat('h:mm a')
+                          .format(end)}',
+                      style: TextStyle(
+                          color: Colors.grey.shade700, fontSize: 13),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Reserved by: $userName',
+                      style: TextStyle(
+                          color: Colors.grey.shade500, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }
