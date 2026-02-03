@@ -431,7 +431,8 @@ class _ReservePageState extends State<ReservePage> {
                                   ),
                                 ),
                                 Text(
-                                  '${widget.room.building} • ${widget.room.floor}',
+                                  '${widget.room.building} • ${widget.room
+                                      .floor}',
                                   style: TextStyle(
                                     color: Colors.grey.shade700,
                                   ),
@@ -457,7 +458,8 @@ class _ReservePageState extends State<ReservePage> {
                           border: OutlineInputBorder(),
                           suffixIcon: Icon(Icons.calendar_today),
                         ),
-                        child: Text(DateFormat('yyyy-MM-dd').format(_selectedDate)),
+                        child: Text(DateFormat('yyyy-MM-dd').format(
+                            _selectedDate)),
                       ),
                     ),
                     const SizedBox(height: 20),
@@ -475,7 +477,8 @@ class _ReservePageState extends State<ReservePage> {
                           border: const OutlineInputBorder(),
                           suffixIcon: const Icon(Icons.access_time),
                           errorText: _timeError ? 'Available: ${widget.room
-                              .availability['startTime'] ?? 'N/A'} - ${widget.room
+                              .availability['startTime'] ?? 'N/A'} - ${widget
+                              .room
                               .availability['endTime'] ?? 'N/A'}' : null,
                         ),
                         child: Text(_startTime.format(context)),
@@ -544,7 +547,7 @@ class _ReservePageState extends State<ReservePage> {
               ),
             ),
           ),
-          
+
           // Bottom Container for Button
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
@@ -587,223 +590,117 @@ class _ReservePageState extends State<ReservePage> {
     );
   }
 
-    void _showExistingReservations(BuildContext context) {
-
-      showModalBottomSheet(
-
-        context: context,
-
-        isScrollControlled: true,
-
-        shape: const RoundedRectangleBorder(
-
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-
-        ),
-
-        builder: (context) {
-
-          return DraggableScrollableSheet(
-
-            initialChildSize: 0.6,
-
-            minChildSize: 0.4,
-
-            maxChildSize: 0.9,
-
-            expand: false,
-
-            builder: (context, scrollController) {
-
-              return Padding(
-
-                padding: const EdgeInsets.all(20.0),
-
-                child: Column(
-
-                  crossAxisAlignment: CrossAxisAlignment.start,
-
-                  children: [
-
-                    const Text(
-
-                      'Existing Reservations',
-
-                      style: TextStyle(
-
-                        fontSize: 20,
-
-                        fontWeight: FontWeight.bold,
-
-                      ),
-
+  void _showExistingReservations(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.6,
+          minChildSize: 0.4,
+          maxChildSize: 0.9,
+          expand: false,
+          builder: (context, scrollController) {
+            return Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Existing Reservations',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
                     ),
-
-                    const SizedBox(height: 16),
-
-                    Expanded(
-
-                      child: _buildExistingReservationsList(scrollController),
-
-                    ),
-
-                  ],
-
-                ),
-
-              );
-
-            },
-
-          );
-
-        },
-
-      );
-
-    }
-
-  
-
-    Widget _buildExistingReservationsList(ScrollController scrollController) {
-
-      return StreamBuilder<QuerySnapshot>(
-
-        stream: FirebaseFirestore.instance
-
-            .collection('bookings')
-
-            .where('roomId', isEqualTo: widget.room.id)
-
-            .snapshots(),
-
-        builder: (context, snapshot) {
-
-          if (snapshot.hasError) {
-
-            return const Text('Error loading reservations');
-
-          }
-
-  
-
-          if (snapshot.connectionState == ConnectionState.waiting) {
-
-            return const Center(child: CircularProgressIndicator());
-
-          }
-
-  
-
-          final docs = snapshot.data?.docs ?? [];
-
-          
-
-          // Filter and sort client-side
-
-          final now = DateTime.now();
-
-          final validBookings = docs.where((doc) {
-
-            final data = doc.data() as Map<String, dynamic>;
-
-            if (data['status'] == 'cancelled' || data['status'] == 'rejected') return false;
-
-            
-
-            final endTimestamp = data['endTime'] as Timestamp?;
-
-            if (endTimestamp == null) return false;
-
-            
-
-            return endTimestamp.toDate().isAfter(now); 
-
-          }).toList();
-
-  
-
-          validBookings.sort((a, b) {
-
-            final startA = (a['startTime'] as Timestamp).toDate();
-
-            final startB = (b['startTime'] as Timestamp).toDate();
-
-            return startA.compareTo(startB);
-
-          });
-
-  
-
-          if (validBookings.isEmpty) {
-
-            return const Center(
-
-              child: Text('No upcoming reservations found.', style: TextStyle(color: Colors.grey)),
-
+                  ),
+                  const SizedBox(height: 16),
+                  Expanded(
+                    child: _buildExistingReservationsList(scrollController),
+                  ),
+                ],
+              ),
             );
+          },
+        );
+      },
+    );
+  }
 
-          }
+  Widget _buildExistingReservationsList(ScrollController scrollController) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('bookings')
+          .where('roomId', isEqualTo: widget.room.id)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return const Text('Error loading reservations');
+        }
 
-  
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-          return ListView.builder(
+        final docs = snapshot.data?.docs ?? [];
+        // Filter and sort client-side
+        final now = DateTime.now();
+        final validBookings = docs.where((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          if (data['status'] == 'cancelled' || data['status'] == 'rejected')
+            return false;
 
-            controller: scrollController,
+          final endTimestamp = data['endTime'] as Timestamp?;
+          if (endTimestamp == null) return false;
+          return endTimestamp.toDate().isAfter(now);
+        }).toList();
 
-            itemCount: validBookings.length,
+        validBookings.sort((a, b) {
+          final startA = (a['startTime'] as Timestamp).toDate();
+          final startB = (b['startTime'] as Timestamp).toDate();
+          return startA.compareTo(startB);
+        });
 
-            itemBuilder: (context, index) {
-
-              final data = validBookings[index].data() as Map<String, dynamic>;
-
-              final start = (data['startTime'] as Timestamp).toDate();
-
-              final end = (data['endTime'] as Timestamp).toDate();
-
-  
-
-              return Card(
-
-                margin: const EdgeInsets.only(bottom: 12),
-
-                elevation: 0,
-
-                color: Colors.grey.shade100,
-
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-
-                child: ListTile(
-
-                  leading: const Icon(Icons.access_time_rounded, color: Colors.blueGrey),
-
-                  title: Text(
-
-                    DateFormat('EEEE, MMM d').format(start),
-
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-
-                  ),
-
-                  subtitle: Text(
-
-                    '${DateFormat('h:mm a').format(start)} - ${DateFormat('h:mm a').format(end)}',
-
-                    style: TextStyle(color: Colors.grey.shade700),
-
-                  ),
-
-                ),
-
-              );
-
-            },
-
+        if (validBookings.isEmpty) {
+          return const Center(
+            child: Text('No upcoming reservations found.',
+                style: TextStyle(color: Colors.grey)),
           );
+        }
 
-        },
+        return ListView.builder(
+          controller: scrollController,
+          itemCount: validBookings.length,
+          itemBuilder: (context, index) {
+            final data = validBookings[index].data() as Map<String, dynamic>;
+            final start = (data['startTime'] as Timestamp).toDate();
+            final end = (data['endTime'] as Timestamp).toDate();
 
-      );
-
-    }
+            return Card(
+              margin: const EdgeInsets.only(bottom: 12),
+              elevation: 0,
+              color: Colors.grey.shade100,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              child: ListTile(
+                leading: const Icon(
+                    Icons.access_time_rounded, color: Colors.blueGrey),
+                title: Text(
+                  DateFormat('EEEE, MMM d').format(start),
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                subtitle: Text(
+                  '${DateFormat('h:mm a').format(start)} - ${DateFormat(
+                      'h:mm a').format(end)}',
+                  style: TextStyle(color: Colors.grey.shade700),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
 }
