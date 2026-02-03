@@ -20,7 +20,7 @@ class _ReservePageState extends State<ReservePage> {
   late TimeOfDay _startTime;
   late int _durationMinutes;
   final TextEditingController _purposeController = TextEditingController();
-  bool _timeError = false;
+  String? _timeErrorMessage;
 
   @override
   void initState() {
@@ -49,9 +49,15 @@ class _ReservePageState extends State<ReservePage> {
     final minDuration = (widget.room
         .bookingRules['minDurationMinutes'] as int?) ?? 30;
     _durationMinutes = minDuration > 0 ? minDuration : 30;
+    
+    // Initial async check
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAvailability();
+    });
   }
 
-  bool _isTimeValid(TimeOfDay time, {int? durationMinutes}) {
+  String? _getTimeError(TimeOfDay time, {int? durationMinutes}) {
+    final l10n = AppLocalizations.of(context);
     final startStr = widget.room.availability['startTime'] as String?;
     final endStr = widget.room.availability['endTime'] as String?;
     final minTime = _parseTime(startStr);
@@ -61,16 +67,86 @@ class _ReservePageState extends State<ReservePage> {
     double? minDouble = minTime != null ? minTime.hour + minTime.minute / 60.0 : null;
     double? maxDouble = maxTime != null ? maxTime.hour + maxTime.minute / 60.0 : null;
 
-    if (minDouble != null && startDouble < minDouble) return false;
+    final availabilityRange = '${l10n.get('availability')}: ${startStr ?? 'N/A'} - ${endStr ?? 'N/A'}';
+
+    if (minDouble != null && startDouble < minDouble) return availabilityRange;
     
     if (durationMinutes != null) {
       double endDouble = startDouble + (durationMinutes / 60.0);
-      if (maxDouble != null && endDouble > maxDouble) return false;
+      if (maxDouble != null && endDouble > maxDouble) return availabilityRange;
     } else {
-      if (maxDouble != null && startDouble >= maxDouble) return false;
+      if (maxDouble != null && startDouble >= maxDouble) return availabilityRange;
+    }
+
+    // Prevent past reservations
+    final now = DateTime.now();
+    final selectedDateTime = DateTime(
+      _selectedDate.year,
+      _selectedDate.month,
+      _selectedDate.day,
+      time.hour,
+      time.minute,
+    );
+    
+    if (selectedDateTime.isBefore(now.subtract(const Duration(minutes: 1)))) {
+      return l10n.get('timeInPast');
     }
     
-    return true;
+    return null;
+  }
+
+  Future<void> _checkAvailability() async {
+    final l10n = AppLocalizations.of(context);
+    
+    // 1. Basic time rules check
+    String? basicError = _getTimeError(_startTime, durationMinutes: _durationMinutes);
+    if (basicError != null) {
+      setState(() {
+        _timeErrorMessage = basicError;
+      });
+      return;
+    }
+
+    setState(() {
+      _timeErrorMessage = null;
+    });
+
+    // 2. Async Overlap check
+    try {
+      final startDateTime = DateTime(
+        _selectedDate.year,
+        _selectedDate.month,
+        _selectedDate.day,
+        _startTime.hour,
+        _startTime.minute,
+      );
+      final endDateTime = startDateTime.add(Duration(minutes: _durationMinutes));
+
+      final existingBookings = await FirebaseFirestore.instance
+          .collection('bookings')
+          .where('roomId', isEqualTo: widget.room.id)
+          .get();
+
+      for (var doc in existingBookings.docs) {
+        final data = doc.data();
+        final String status = (data['status'] as String).toLowerCase();
+        if (status == 'cancelled' || status == 'rejected' || status == 'completed') continue;
+
+        final existingStart = (data['startTime'] as Timestamp).toDate();
+        final existingEnd = (data['endTime'] as Timestamp).toDate();
+
+        if (startDateTime.isBefore(existingEnd) && endDateTime.isAfter(existingStart)) {
+          if (mounted) {
+            setState(() {
+              _timeErrorMessage = l10n.get('timeOverlap');
+            });
+          }
+          return;
+        }
+      }
+    } catch (e) {
+      debugPrint('Error checking live availability: $e');
+    }
   }
 
   @override
@@ -148,6 +224,7 @@ class _ReservePageState extends State<ReservePage> {
       setState(() {
         _selectedDate = picked;
       });
+      _checkAvailability();
     }
   }
 
@@ -160,31 +237,23 @@ class _ReservePageState extends State<ReservePage> {
     if (picked != null) {
       setState(() {
         _startTime = picked;
-        _timeError = !_isTimeValid(picked, durationMinutes: _durationMinutes);
       });
+      _checkAvailability();
     }
   }
 
   Future<void> _submitReservation() async {
+    final l10n = AppLocalizations.of(context);
+    
+    // Final UI check
+    if (_timeErrorMessage != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_timeErrorMessage!)),
+      );
+      return;
+    }
+
     if (_formKey.currentState!.validate()) {
-      final l10n = AppLocalizations.of(context);
-      if (!_isTimeValid(_startTime, durationMinutes: _durationMinutes)) {
-        final startStr = widget.room.availability['startTime'] as String? ?? 'N/A';
-        final endStr = widget.room.availability['endTime'] as String? ?? 'N/A';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${l10n.get('availability')}: $startStr - $endStr')),
-        );
-        return;
-      }
-
-      final List<int> allowedDays = (widget.room.availability['daysOfWeek'] as List<dynamic>?)?.cast<int>() ?? [];
-      if (allowedDays.isNotEmpty && !allowedDays.contains(_selectedDate.weekday)) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.get('currentlyUnavailable'))),
-        );
-        return;
-      }
-
       final startDateTime = DateTime(
         _selectedDate.year,
         _selectedDate.month,
@@ -214,6 +283,7 @@ class _ReservePageState extends State<ReservePage> {
         debugPrint('Error fetching user details: $e');
       }
 
+      // Re-verify overlap before final submission to be absolutely sure
       try {
         final existingBookings = await FirebaseFirestore.instance
             .collection('bookings')
@@ -222,7 +292,8 @@ class _ReservePageState extends State<ReservePage> {
 
         for (var doc in existingBookings.docs) {
           final data = doc.data();
-          if (data['status'] == 'cancelled' || data['status'] == 'rejected') continue;
+          final String s = (data['status'] as String).toLowerCase();
+          if (s == 'cancelled' || s == 'rejected' || s == 'completed') continue;
 
           final existingStart = (data['startTime'] as Timestamp).toDate();
           final existingEnd = (data['endTime'] as Timestamp).toDate();
@@ -230,7 +301,7 @@ class _ReservePageState extends State<ReservePage> {
           if (startDateTime.isBefore(existingEnd) && endDateTime.isAfter(existingStart)) {
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(l10n.get('roomReserved'))),
+                SnackBar(content: Text(l10n.get('timeOverlap'))),
               );
             }
             return;
@@ -238,12 +309,6 @@ class _ReservePageState extends State<ReservePage> {
         }
       } catch (e) {
         debugPrint('Error checking overlaps: $e');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('${l10n.get('somethingWentWrong')}: $e')),
-          );
-        }
-        return;
       }
 
       try {
@@ -412,7 +477,7 @@ class _ReservePageState extends State<ReservePage> {
                         value: _startTime.format(context),
                         icon: Icons.access_time_rounded,
                         onTap: () => _selectTime(context),
-                        errorText: _timeError ? '${l10n.get('availability')}: ${widget.room.availability['startTime'] ?? 'N/A'} - ${widget.room.availability['endTime'] ?? 'N/A'}' : null,
+                        errorText: _timeErrorMessage,
                       ),
                       const SizedBox(height: 16),
                       _SectionHeader(title: l10n.get('duration')),
@@ -437,12 +502,13 @@ class _ReservePageState extends State<ReservePage> {
                                 child: Text(_formatDuration(value)),
                               );
                             }).toList(),
-                                                      onChanged: (int? newValue) {
-                                                        setState(() {
-                                                          _durationMinutes = newValue!;
-                                                          _timeError = !_isTimeValid(_startTime, durationMinutes: _durationMinutes);
-                                                        });
-                                                      },                            validator: (value) {
+                            onChanged: (int? newValue) {
+                              setState(() {
+                                _durationMinutes = newValue!;
+                              });
+                              _checkAvailability();
+                            },
+                            validator: (value) {
                               final min = widget.room.bookingRules['minDurationMinutes'] as int? ?? 0;
                               final max = widget.room.bookingRules['maxDurationMinutes'] as int? ?? 1440;
                               if (value! < min && min > 0) return 'Min: ${_formatDuration(min)}';
@@ -458,6 +524,7 @@ class _ReservePageState extends State<ReservePage> {
                       TextFormField(
                         controller: _purposeController,
                         maxLines: 3,
+                        maxLength: 50,
                         decoration: InputDecoration(
                           hintText: l10n.get('meetingWorkshop'),
                           filled: true,
@@ -507,7 +574,7 @@ class _ReservePageState extends State<ReservePage> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: colorScheme.primary,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    padding: const EdgeInsets.symmetric(vertical: 18),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
@@ -604,7 +671,9 @@ class _ReservePageState extends State<ReservePage> {
         final now = DateTime.now();
         final validBookings = docs.where((doc) {
           final data = doc.data() as Map<String, dynamic>;
-          if (data['status'] == 'cancelled' || data['status'] == 'rejected') return false;
+          final String status = (data['status'] as String).toLowerCase();
+          // Exclude cancelled, rejected, and completed bookings.
+          if (status == 'cancelled' || status == 'rejected' || status == 'completed') return false;
           final endTimestamp = data['endTime'] as Timestamp?;
           if (endTimestamp == null) return false;
           return endTimestamp.toDate().isAfter(now);

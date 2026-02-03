@@ -106,6 +106,8 @@ class AppLocalizations {
       'existingReservations': 'Existing Reservations',
       'noUpcomingReservations': 'No upcoming reservations found.',
       'lastUpdated': 'Last updated: January 2026',
+      'timeInPast': 'Selected time is in the past',
+      'timeOverlap': 'Selected time overlaps with an existing booking',
       // Terms of Use
       'tou_sec1_title': '1. Acceptance of Terms',
       'tou_sec1_text': 'By accessing or using RoomReserve, you acknowledge that you have read, understood, and agree to comply with these Terms of Use. If you do not agree with any part of these terms, you must discontinue use of the system.',
@@ -272,6 +274,8 @@ class AppLocalizations {
       'existingReservations': '現在の予約状況',
       'noUpcomingReservations': '今後の予約はありません',
       'lastUpdated': '最終更新日：2026年1月',
+      'timeInPast': '過去の時間は選択できません',
+      'timeOverlap': '他の予約と重なっています',
       // 利用規約
       'tou_sec1_title': '1. 規約への同意',
       'tou_sec1_text': 'RoomReserveにアクセスまたは使用することにより、利用者は本利用規約を読み、理解し、遵守することに同意したものとみなされます。本規約のいずれかの部分に同意しない場合は、システムの利用を中止してください。',

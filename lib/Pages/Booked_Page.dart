@@ -105,9 +105,9 @@ class _BookedPageState extends State<BookedPage>
                 _MinWidthTab(text: 'All'),
                 _MinWidthTab(text: 'Pending'),
                 _MinWidthTab(text: 'Approved'),
+                _MinWidthTab(text: 'Completed'),
                 _MinWidthTab(text: 'Cancelled'),
                 _MinWidthTab(text: 'Rejected'),
-                _MinWidthTab(text: 'Completed'),
               ],
             ),
           ),
@@ -154,9 +154,9 @@ class _BookedPageState extends State<BookedPage>
                       _buildBookingStream(null, organizationName), // All
                       _buildBookingStream('Pending', organizationName),
                       _buildBookingStream('Approved', organizationName),
+                      _buildBookingStream('Completed', organizationName),
                       _buildBookingStream('Cancelled', organizationName),
                       _buildBookingStream('Rejected', organizationName),
-                      _buildBookingStream('Completed', organizationName),
                     ],
                   ),
                 ),
@@ -207,8 +207,21 @@ class _BookedPageState extends State<BookedPage>
           }).toList();
         }
 
-        // 3. Sort by startTime descending (newest first)
-        bookings.sort((a, b) => b.startTime.compareTo(a.startTime));
+        // 3. Sort by status priority then by startTime descending
+        final statusPriority = {
+          'pending': 0,
+          'approved': 1,
+          'completed': 2,
+          'cancelled': 3,
+          'rejected': 4,
+        };
+
+        bookings.sort((a, b) {
+          int pA = statusPriority[a.status.toLowerCase()] ?? 5;
+          int pB = statusPriority[b.status.toLowerCase()] ?? 5;
+          if (pA != pB) return pA.compareTo(pB);
+          return b.startTime.compareTo(a.startTime);
+        });
 
         if (bookings.isEmpty) {
           return Center(
