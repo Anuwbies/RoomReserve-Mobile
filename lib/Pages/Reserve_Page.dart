@@ -389,149 +389,176 @@ class _ReservePageState extends State<ReservePage> {
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.calendar_month_rounded),
+            onPressed: () => _showExistingReservations(context),
+            tooltip: 'View Existing Reservations',
+          ),
+        ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Room Summary
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: colorScheme.primary.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
+      body: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20.0),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.meeting_room, color: colorScheme.primary,
-                        size: 40),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                    // Room Summary
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: colorScheme.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
                         children: [
-                          Text(
-                            widget.room.name,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Text(
-                            '${widget.room.building} • ${widget.room.floor}',
-                            style: TextStyle(
-                              color: Colors.grey.shade700,
+                          Icon(Icons.meeting_room, color: colorScheme.primary,
+                              size: 40),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  widget.room.name,
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                Text(
+                                  '${widget.room.building} • ${widget.room.floor}',
+                                  style: TextStyle(
+                                    color: Colors.grey.shade700,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
                       ),
                     ),
+                    const SizedBox(height: 24),
+
+                    // Date Picker
+                    Text('Date', style: Theme
+                        .of(context)
+                        .textTheme
+                        .titleMedium),
+                    const SizedBox(height: 8),
+                    InkWell(
+                      onTap: () => _selectDate(context),
+                      child: InputDecorator(
+                        decoration: const InputDecoration(
+                          border: OutlineInputBorder(),
+                          suffixIcon: Icon(Icons.calendar_today),
+                        ),
+                        child: Text(DateFormat('yyyy-MM-dd').format(_selectedDate)),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Time Picker
+                    Text('Start Time', style: Theme
+                        .of(context)
+                        .textTheme
+                        .titleMedium),
+                    const SizedBox(height: 8),
+                    InkWell(
+                      onTap: () => _selectTime(context),
+                      child: InputDecorator(
+                        decoration: InputDecoration(
+                          border: const OutlineInputBorder(),
+                          suffixIcon: const Icon(Icons.access_time),
+                          errorText: _timeError ? 'Available: ${widget.room
+                              .availability['startTime'] ?? 'N/A'} - ${widget.room
+                              .availability['endTime'] ?? 'N/A'}' : null,
+                        ),
+                        child: Text(_startTime.format(context)),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Duration
+                    Text('Duration', style: Theme
+                        .of(context)
+                        .textTheme
+                        .titleMedium),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<int>(
+                      value: _durationMinutes,
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                      ),
+                      items: durationOptions.map((int value) {
+                        return DropdownMenuItem<int>(
+                          value: value,
+                          child: Text(_formatDuration(value)),
+                        );
+                      }).toList(),
+                      onChanged: (int? newValue) {
+                        setState(() {
+                          _durationMinutes = newValue!;
+                        });
+                      },
+                      validator: (value) {
+                        final min = widget.room
+                            .bookingRules['minDurationMinutes'] as int? ?? 0;
+                        final max = widget.room
+                            .bookingRules['maxDurationMinutes'] as int? ?? 1440;
+                        if (value! < min && min > 0)
+                          return 'Minimum duration is ${_formatDuration(min)}';
+                        if (value > max && max > 0)
+                          return 'Maximum duration is ${_formatDuration(max)}';
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Purpose
+                    Text('Purpose', style: Theme
+                        .of(context)
+                        .textTheme
+                        .titleMedium),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _purposeController,
+                      decoration: const InputDecoration(
+                        hintText: 'Meeting, Workshop, etc.',
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter a purpose';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 32),
                   ],
                 ),
               ),
-              const SizedBox(height: 24),
-
-              // Date Picker
-              Text('Date', style: Theme
-                  .of(context)
-                  .textTheme
-                  .titleMedium),
-              const SizedBox(height: 8),
-              InkWell(
-                onTap: () => _selectDate(context),
-                child: InputDecorator(
-                  decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
-                    suffixIcon: Icon(Icons.calendar_today),
-                  ),
-                  child: Text(DateFormat('yyyy-MM-dd').format(_selectedDate)),
+            ),
+          ),
+          
+          // Bottom Container for Button
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+            decoration: BoxDecoration(
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, -5),
                 ),
-              ),
-              const SizedBox(height: 20),
-
-              // Time Picker
-              Text('Start Time', style: Theme
-                  .of(context)
-                  .textTheme
-                  .titleMedium),
-              const SizedBox(height: 8),
-              InkWell(
-                onTap: () => _selectTime(context),
-                child: InputDecorator(
-                  decoration: InputDecoration(
-                    border: const OutlineInputBorder(),
-                    suffixIcon: const Icon(Icons.access_time),
-                    errorText: _timeError ? 'Available: ${widget.room
-                        .availability['startTime'] ?? 'N/A'} - ${widget.room
-                        .availability['endTime'] ?? 'N/A'}' : null,
-                  ),
-                  child: Text(_startTime.format(context)),
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // Duration
-              Text('Duration', style: Theme
-                  .of(context)
-                  .textTheme
-                  .titleMedium),
-              const SizedBox(height: 8),
-              DropdownButtonFormField<int>(
-                value: _durationMinutes,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                ),
-                items: durationOptions.map((int value) {
-                  return DropdownMenuItem<int>(
-                    value: value,
-                    child: Text(_formatDuration(value)),
-                  );
-                }).toList(),
-                onChanged: (int? newValue) {
-                  setState(() {
-                    _durationMinutes = newValue!;
-                  });
-                },
-                validator: (value) {
-                  final min = widget.room
-                      .bookingRules['minDurationMinutes'] as int? ?? 0;
-                  final max = widget.room
-                      .bookingRules['maxDurationMinutes'] as int? ?? 1440;
-                  if (value! < min && min > 0)
-                    return 'Minimum duration is ${_formatDuration(min)}';
-                  if (value > max && max > 0)
-                    return 'Maximum duration is ${_formatDuration(max)}';
-                  return null;
-                },
-              ),
-              const SizedBox(height: 20),
-
-              // Purpose
-              Text('Purpose', style: Theme
-                  .of(context)
-                  .textTheme
-                  .titleMedium),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: _purposeController,
-                decoration: const InputDecoration(
-                  hintText: 'Meeting, Workshop, etc.',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a purpose';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 32),
-
-              // Submit Button
-              SizedBox(
+              ],
+            ),
+            child: SafeArea(
+              child: SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: _submitReservation,
@@ -539,8 +566,9 @@ class _ReservePageState extends State<ReservePage> {
                     backgroundColor: colorScheme.primary,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(16),
                     ),
+                    elevation: 0,
                   ),
                   child: const Text(
                     'Confirm Reservation',
@@ -552,133 +580,230 @@ class _ReservePageState extends State<ReservePage> {
                   ),
                 ),
               ),
-
-              const SizedBox(height: 32),
-
-              // Existing Reservations List
-              const Text(
-                'Existing Reservations',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 16),
-              _buildExistingReservationsList(),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
 
-  Widget _buildExistingReservationsList() {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('bookings')
-          .where('roomId', isEqualTo: widget.room.id)
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return const Text('Error loading reservations');
-        }
+    void _showExistingReservations(BuildContext context) {
 
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
+      showModalBottomSheet(
 
-        final docs = snapshot.data?.docs ?? [];
+        context: context,
 
-        // Filter and sort client-side to avoid index issues
-        final now = DateTime.now();
-        final validBookings = docs.where((doc) {
-          final data = doc.data() as Map<String, dynamic>;
-          if (data['status'] == 'cancelled' || data['status'] == 'rejected')
-            return false;
+        isScrollControlled: true,
 
-          final endTimestamp = data['endTime'] as Timestamp?;
-          if (endTimestamp == null) return false;
+        shape: const RoundedRectangleBorder(
 
-          return endTimestamp.toDate().isAfter(
-              now); // Only show upcoming/ongoing
-        }).toList();
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
 
-        // Sort by start time
-        validBookings.sort((a, b) {
-          final startA = (a['startTime'] as Timestamp).toDate();
-          final startB = (b['startTime'] as Timestamp).toDate();
-          return startA.compareTo(startB);
-        });
+        ),
 
-        if (validBookings.isEmpty) {
-          return const Padding(
-            padding: EdgeInsets.all(16.0),
-            child: Text(
-              'No upcoming reservations found.',
-              style: TextStyle(color: Colors.grey),
-            ),
-          );
-        }
+        builder: (context) {
 
-        return ListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: validBookings.length,
-          itemBuilder: (context, index) {
-            final data = validBookings[index].data() as Map<String, dynamic>;
-            final start = (data['startTime'] as Timestamp).toDate();
-            final end = (data['endTime'] as Timestamp).toDate();
-            final purpose = data['purpose'] ?? 'Reserved';
-            final userName = data['userName'] ?? 'Unknown User';
+          return DraggableScrollableSheet(
 
-            return Card(
-              margin: const EdgeInsets.only(bottom: 12),
-              elevation: 0,
-              color: Colors.grey.shade100,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-              child: ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.grey.shade300),
-                  ),
-                  child: const Icon(
-                      Icons.event_seat, size: 20, color: Colors.blueGrey),
-                ),
-                title: Text(
-                  purpose,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w600, fontSize: 15),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                subtitle: Column(
+            initialChildSize: 0.6,
+
+            minChildSize: 0.4,
+
+            maxChildSize: 0.9,
+
+            expand: false,
+
+            builder: (context, scrollController) {
+
+              return Padding(
+
+                padding: const EdgeInsets.all(20.0),
+
+                child: Column(
+
                   crossAxisAlignment: CrossAxisAlignment.start,
+
                   children: [
-                    const SizedBox(height: 4),
-                    Text(
-                      '${DateFormat('MMM d').format(start)} • ${DateFormat(
-                          'h:mm a').format(start)} - ${DateFormat('h:mm a')
-                          .format(end)}',
+
+                    const Text(
+
+                      'Existing Reservations',
+
                       style: TextStyle(
-                          color: Colors.grey.shade700, fontSize: 13),
+
+                        fontSize: 20,
+
+                        fontWeight: FontWeight.bold,
+
+                      ),
+
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Reserved by: $userName',
-                      style: TextStyle(
-                          color: Colors.grey.shade500, fontSize: 12),
+
+                    const SizedBox(height: 16),
+
+                    Expanded(
+
+                      child: _buildExistingReservationsList(scrollController),
+
                     ),
+
                   ],
+
                 ),
-              ),
+
+              );
+
+            },
+
+          );
+
+        },
+
+      );
+
+    }
+
+  
+
+    Widget _buildExistingReservationsList(ScrollController scrollController) {
+
+      return StreamBuilder<QuerySnapshot>(
+
+        stream: FirebaseFirestore.instance
+
+            .collection('bookings')
+
+            .where('roomId', isEqualTo: widget.room.id)
+
+            .snapshots(),
+
+        builder: (context, snapshot) {
+
+          if (snapshot.hasError) {
+
+            return const Text('Error loading reservations');
+
+          }
+
+  
+
+          if (snapshot.connectionState == ConnectionState.waiting) {
+
+            return const Center(child: CircularProgressIndicator());
+
+          }
+
+  
+
+          final docs = snapshot.data?.docs ?? [];
+
+          
+
+          // Filter and sort client-side
+
+          final now = DateTime.now();
+
+          final validBookings = docs.where((doc) {
+
+            final data = doc.data() as Map<String, dynamic>;
+
+            if (data['status'] == 'cancelled' || data['status'] == 'rejected') return false;
+
+            
+
+            final endTimestamp = data['endTime'] as Timestamp?;
+
+            if (endTimestamp == null) return false;
+
+            
+
+            return endTimestamp.toDate().isAfter(now); 
+
+          }).toList();
+
+  
+
+          validBookings.sort((a, b) {
+
+            final startA = (a['startTime'] as Timestamp).toDate();
+
+            final startB = (b['startTime'] as Timestamp).toDate();
+
+            return startA.compareTo(startB);
+
+          });
+
+  
+
+          if (validBookings.isEmpty) {
+
+            return const Center(
+
+              child: Text('No upcoming reservations found.', style: TextStyle(color: Colors.grey)),
+
             );
-          },
-        );
-      },
-    );
-  }
+
+          }
+
+  
+
+          return ListView.builder(
+
+            controller: scrollController,
+
+            itemCount: validBookings.length,
+
+            itemBuilder: (context, index) {
+
+              final data = validBookings[index].data() as Map<String, dynamic>;
+
+              final start = (data['startTime'] as Timestamp).toDate();
+
+              final end = (data['endTime'] as Timestamp).toDate();
+
+  
+
+              return Card(
+
+                margin: const EdgeInsets.only(bottom: 12),
+
+                elevation: 0,
+
+                color: Colors.grey.shade100,
+
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+
+                child: ListTile(
+
+                  leading: const Icon(Icons.access_time_rounded, color: Colors.blueGrey),
+
+                  title: Text(
+
+                    DateFormat('EEEE, MMM d').format(start),
+
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+
+                  ),
+
+                  subtitle: Text(
+
+                    '${DateFormat('h:mm a').format(start)} - ${DateFormat('h:mm a').format(end)}',
+
+                    style: TextStyle(color: Colors.grey.shade700),
+
+                  ),
+
+                ),
+
+              );
+
+            },
+
+          );
+
+        },
+
+      );
+
+    }
 }
