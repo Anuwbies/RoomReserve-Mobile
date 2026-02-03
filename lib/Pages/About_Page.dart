@@ -26,7 +26,7 @@ class AboutPage extends StatelessWidget {
                       'About',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontSize: 24,
+                        fontSize: 20,
                         fontWeight: FontWeight.w700,
                       ),
                     ),

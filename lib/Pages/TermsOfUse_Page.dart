@@ -11,7 +11,6 @@ class TermsOfUsePage extends StatelessWidget {
         child: Column(
           children: [
             const SizedBox(height: 16),
-
             // Header: Back button + centered title
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -26,7 +25,7 @@ class TermsOfUsePage extends StatelessWidget {
                       'Terms of Use',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontSize: 24,
+                        fontSize: 20,
                         fontWeight: FontWeight.w700,
                       ),
                     ),

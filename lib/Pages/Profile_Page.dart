@@ -105,7 +105,7 @@ class _ProfilePageState extends State<ProfilePage> {
               const SizedBox(height: 10),
               const Divider(),
               _LanguageItem(locale: const Locale('en'), name: 'English'),
-              _LanguageItem(locale: const Locale('ja'), name: 'Japanese'),
+              _LanguageItem(locale: const Locale('ja'), name: '日本語'),
             ],
           ),
         );
@@ -376,196 +376,211 @@ class _ProfilePageState extends State<ProfilePage> {
 
     return Scaffold(
       backgroundColor: _kBackgroundColor,
-      appBar: AppBar(
-        backgroundColor: _kBackgroundColor,
-        elevation: 0,
-        title: Text(
-          l10n.get('myProfile'),
-          style: const TextStyle(
-            color: Colors.black87,
-            fontWeight: FontWeight.bold,
-            fontSize: 22,
-          ),
-        ),
-        centerTitle: true,
-      ),
-      body: StreamBuilder<DocumentSnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .snapshots(),
-        builder: (context, userSnapshot) {
-          if (userSnapshot.hasError) {
-            return Center(child: Text('Error: ${userSnapshot.error}'));
-          }
-
-          if (userSnapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          return StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance
-                .collection('memberships')
-                .where('userId', isEqualTo: user.uid)
-                .where('status', whereIn: ['pending', 'approved', 'kicked', 'declined'])
-                .limit(1)
-                .snapshots(),
-            builder: (context, membershipSnapshot) {
-              // Fix flicker: Show loading if connecting
-              if (membershipSnapshot.connectionState == ConnectionState.waiting) {
-                 return const Center(child: CircularProgressIndicator());
-              }
-
-              String? orgName;
-              String? status;
-              String? membershipId;
-
-              if (membershipSnapshot.hasData && membershipSnapshot.data!.docs.isNotEmpty) {
-                final doc = membershipSnapshot.data!.docs.first;
-                final data = doc.data() as Map<String, dynamic>;
-                orgName = data['organizationName'];
-                status = data['status'];
-                membershipId = doc.id;
-              }
-              
-              // Sync user.organizationName with membership status
-              final userData = userSnapshot.data?.data() as Map<String, dynamic>?;
-              final userOrg = userData?['organizationName'] as String?;
-              _syncOrganizationName(user.uid, userOrg, orgName, status);
-
-              return SingleChildScrollView(
-                physics: const ClampingScrollPhysics(),
-                child: Column(
-                  children: [
-                    const SizedBox(height: 10),
-
-                    // 1. Header Section
-                    _ProfileHeader(
-                      photoUrl: photoUrl,
-                      displayName: displayName,
-                      email: email,
-                      organizationName: orgName,
-                      membershipStatus: status,
-                      onSelectOrganization: () => _selectOrganization(user),
-                      onLeaveOrCancel: () => _confirmLeaveOrCancel(context, membershipId, status),
-                    ),
-
-                    const SizedBox(height: 24),
-
-                    // 2. Menu Section: General
-                    _ProfileSection(
-                      title: l10n.get('general'),
-                      children: [
-                        _ProfileMenuItem(
-                          icon: Icons.notifications_none_rounded,
-                          iconColor: Colors.orange,
-                          title: l10n.get('notifications'),
-                          onTap: () {},
-                        ),
-                        _ProfileMenuItem(
-                          icon: Icons.language_rounded,
-                          iconColor: Colors.purple,
-                          title: l10n.get('language'),
-                          trailingText: _getLanguageName(Localizations.localeOf(context).languageCode),
-                          onTap: () => _showLanguageSelector(context),
-                          isLast: true,
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    // 3. Menu Section: Support & Legal
-                    _ProfileSection(
-                      title: l10n.get('supportLegal'),
-                      children: [
-                        _ProfileMenuItem(
-                          icon: Icons.description_outlined,
-                          iconColor: Colors.blue,
-                          title: l10n.get('termsOfUse'),
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) => const TermsOfUsePage()),
-                          ),
-                        ),
-                        _ProfileMenuItem(
-                          icon: Icons.lock_outline_rounded,
-                          iconColor: Colors.teal,
-                          title: l10n.get('privacyPolicy'),
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) => const PrivacyPolicyPage()),
-                          ),
-                        ),
-                        _ProfileMenuItem(
-                          icon: Icons.help_outline_rounded,
-                          iconColor: Colors.indigo,
-                          title: l10n.get('faq'),
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const FaqPage()),
-                          ),
-                        ),
-                        _ProfileMenuItem(
-                          icon: Icons.info_outline_rounded,
-                          iconColor: Colors.grey.shade700,
-                          title: l10n.get('aboutApp'),
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const AboutPage()),
-                          ),
-                          isLast: true,
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    // 4. Logout Button
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: SizedBox(
-                        width: double.infinity,
-                        child: TextButton(
-                          onPressed: () => _showLogoutConfirmation(context),
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            backgroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                              side: BorderSide(color: Colors.grey.shade300),
-                            ),
-                          ),
-                          child: Text(
-                            l10n.get('logOut'),
-                            style: const TextStyle(
-                              color: _kDangerColor,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            const SizedBox(height: 16),
+            // Custom Header Row
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      l10n.get('myProfile'),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.black87,
                       ),
                     ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 6),
 
-                    const SizedBox(height: 20),
-                  ],
-                ),
-              );
-            },
-          );
-        },
+            Expanded(
+              child: StreamBuilder<DocumentSnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(user.uid)
+                    .snapshots(),
+                builder: (context, userSnapshot) {
+                  if (userSnapshot.hasError) {
+                    return Center(child: Text('Error: ${userSnapshot.error}'));
+                  }
+
+                  if (userSnapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  return StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance
+                        .collection('memberships')
+                        .where('userId', isEqualTo: user.uid)
+                        .where('status', whereIn: ['pending', 'approved', 'kicked', 'declined'])
+                        .limit(1)
+                        .snapshots(),
+                    builder: (context, membershipSnapshot) {
+                      // Fix flicker: Show loading if connecting
+                      if (membershipSnapshot.connectionState == ConnectionState.waiting) {
+                         return const Center(child: CircularProgressIndicator());
+                      }
+
+                      String? orgName;
+                      String? status;
+                      String? membershipId;
+
+                      if (membershipSnapshot.hasData && membershipSnapshot.data!.docs.isNotEmpty) {
+                        final doc = membershipSnapshot.data!.docs.first;
+                        final data = doc.data() as Map<String, dynamic>;
+                        orgName = data['organizationName'];
+                        status = data['status'];
+                        membershipId = doc.id;
+                      }
+                      
+                      // Sync user.organizationName with membership status
+                      final userData = userSnapshot.data?.data() as Map<String, dynamic>?;
+                      final userOrg = userData?['organizationName'] as String?;
+                      _syncOrganizationName(user.uid, userOrg, orgName, status);
+
+                      return SingleChildScrollView(
+                        physics: const ClampingScrollPhysics(),
+                        child: Column(
+                          children: [
+                            const SizedBox(height: 10),
+
+                            // 1. Header Section
+                            _ProfileHeader(
+                              photoUrl: photoUrl,
+                              displayName: displayName,
+                              email: email,
+                              organizationName: orgName,
+                              membershipStatus: status,
+                              onSelectOrganization: () => _selectOrganization(user),
+                              onLeaveOrCancel: () => _confirmLeaveOrCancel(context, membershipId, status),
+                            ),
+
+                            const SizedBox(height: 24),
+
+                            // 2. Menu Section: General
+                            _ProfileSection(
+                              title: l10n.get('general'),
+                              children: [
+                                _ProfileMenuItem(
+                                  icon: Icons.notifications_none_rounded,
+                                  iconColor: Colors.orange,
+                                  title: l10n.get('notifications'),
+                                  onTap: () {},
+                                ),
+                                _ProfileMenuItem(
+                                  icon: Icons.language_rounded,
+                                  iconColor: Colors.purple,
+                                  title: l10n.get('language'),
+                                  trailingText: _getLanguageName(Localizations.localeOf(context).languageCode),
+                                  onTap: () => _showLanguageSelector(context),
+                                  isLast: true,
+                                ),
+                              ],
+                            ),
+
+                            const SizedBox(height: 20),
+
+                            // 3. Menu Section: Support & Legal
+                            _ProfileSection(
+                              title: l10n.get('supportLegal'),
+                              children: [
+                                _ProfileMenuItem(
+                                  icon: Icons.description_outlined,
+                                  iconColor: Colors.blue,
+                                  title: l10n.get('termsOfUse'),
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                        builder: (_) => const TermsOfUsePage()),
+                                  ),
+                                ),
+                                _ProfileMenuItem(
+                                  icon: Icons.lock_outline_rounded,
+                                  iconColor: Colors.teal,
+                                  title: l10n.get('privacyPolicy'),
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                        builder: (_) => const PrivacyPolicyPage()),
+                                  ),
+                                ),
+                                _ProfileMenuItem(
+                                  icon: Icons.help_outline_rounded,
+                                  iconColor: Colors.indigo,
+                                  title: l10n.get('faq'),
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (_) => const FaqPage()),
+                                  ),
+                                ),
+                                _ProfileMenuItem(
+                                  icon: Icons.info_outline_rounded,
+                                  iconColor: Colors.grey.shade700,
+                                  title: l10n.get('aboutApp'),
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (_) => const AboutPage()),
+                                  ),
+                                  isLast: true,
+                                ),
+                              ],
+                            ),
+
+                            const SizedBox(height: 20),
+
+                            // 4. Logout Button
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 20),
+                              child: SizedBox(
+                                width: double.infinity,
+                                child: TextButton(
+                                  onPressed: () => _showLogoutConfirmation(context),
+                                  style: TextButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                    backgroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                      side: BorderSide(color: Colors.grey.shade300),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    l10n.get('logOut'),
+                                    style: const TextStyle(
+                                      color: _kDangerColor,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                            const SizedBox(height: 20),
+                          ],
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   String _getLanguageName(String code) {
     switch (code) {
-      case 'fil': return 'Filipino';
-      case 'ja': return 'Japanese';
-      case 'ko': return 'Korean';
+      case 'ja': return '日本語';
       default: return 'English';
     }
   }

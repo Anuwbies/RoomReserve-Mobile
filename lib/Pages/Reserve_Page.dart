@@ -70,8 +70,6 @@ class _ReservePageState extends State<ReservePage> {
     return true;
   }
 
-  // ... (dispose, _formatDuration, _parseTime, _getInitialDate remain same)
-
   @override
   void dispose() {
     _purposeController.dispose();
@@ -123,12 +121,10 @@ class _ReservePageState extends State<ReservePage> {
         .availability['daysOfWeek'] as List<dynamic>?)?.cast<int>() ?? [];
 
     DateTime initialDate = _selectedDate;
-    // Check if current _selectedDate is valid (it should be from init, but good to be safe)
     if (allowedDays.isNotEmpty && !allowedDays.contains(initialDate.weekday)) {
       initialDate = _getInitialDate(allowedDays);
     }
 
-    // Ensure initialDate is within range
     if (initialDate.isAfter(lastDate)) {
       initialDate = lastDate;
     } else if (initialDate.isBefore(DateTime.now())) {
@@ -168,30 +164,24 @@ class _ReservePageState extends State<ReservePage> {
 
   Future<void> _submitReservation() async {
     if (_formKey.currentState!.validate()) {
-      // Final availability check
+      final l10n = AppLocalizations.of(context);
       if (!_isTimeValid(_startTime)) {
-        final startStr = widget.room.availability['startTime'] as String? ??
-            'N/A';
+        final startStr = widget.room.availability['startTime'] as String? ?? 'N/A';
         final endStr = widget.room.availability['endTime'] as String? ?? 'N/A';
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(
-              'Selected time is outside availability ($startStr - $endStr)')),
+          SnackBar(content: Text('${l10n.get('availability')}: $startStr - $endStr')),
         );
         return;
       }
 
-      final List<int> allowedDays = (widget.room
-          .availability['daysOfWeek'] as List<dynamic>?)?.cast<int>() ?? [];
-      if (allowedDays.isNotEmpty &&
-          !allowedDays.contains(_selectedDate.weekday)) {
+      final List<int> allowedDays = (widget.room.availability['daysOfWeek'] as List<dynamic>?)?.cast<int>() ?? [];
+      if (allowedDays.isNotEmpty && !allowedDays.contains(_selectedDate.weekday)) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Selected date is not available for this room')),
+          SnackBar(content: Text(l10n.get('currentlyUnavailable'))),
         );
         return;
       }
 
-      // Calculate End Time
       final startDateTime = DateTime(
         _selectedDate.year,
         _selectedDate.month,
@@ -199,66 +189,29 @@ class _ReservePageState extends State<ReservePage> {
         _startTime.hour,
         _startTime.minute,
       );
-      final endDateTime = startDateTime.add(
-          Duration(minutes: _durationMinutes));
+      final endDateTime = startDateTime.add(Duration(minutes: _durationMinutes));
 
-      // Determine Status
-      final bool requiresApproval = widget.room
-          .bookingRules['requiresApproval'] == true;
+      final bool requiresApproval = widget.room.bookingRules['requiresApproval'] == true;
       final String status = requiresApproval ? 'Pending' : 'Approved';
 
-      // Fetch User Details
       String userName = 'Unknown';
       String organization = 'None';
-      String createdAt = 'N/A';
-      String updatedAt = 'N/A';
 
       try {
         final user = FirebaseAuth.instance.currentUser;
         if (user != null) {
-          final userDoc = await FirebaseFirestore.instance.collection('users')
-              .doc(user.uid)
-              .get();
+          final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
           if (userDoc.exists) {
             final data = userDoc.data()!;
             userName = data['name'] ?? user.displayName ?? 'Unknown';
             organization = data['organizationName'] ?? 'None';
-            createdAt =
-                (data['createdAt'] as Timestamp?)?.toDate().toString() ?? 'N/A';
-            updatedAt =
-                (data['updatedAt'] as Timestamp?)?.toDate().toString() ?? 'N/A';
           }
         }
       } catch (e) {
         debugPrint('Error fetching user details: $e');
       }
 
-      // Log details
-      debugPrint('--- Reservation Details ---');
-      debugPrint('Room: ${widget.room.name}');
-      debugPrint('Building: ${widget.room.building}');
-      debugPrint('Floor: ${widget.room.floor}');
-      debugPrint('Date: ${DateFormat('yyyy-MM-dd').format(_selectedDate)}');
-      debugPrint('Start Time: ${_startTime.format(context)}');
-      debugPrint('Duration: $_durationMinutes minutes');
-      debugPrint('End Time: ${DateFormat('HH:mm').format(endDateTime)}');
-      debugPrint('Purpose: ${_purposeController.text}');
-      debugPrint('Status: $status');
-      debugPrint('User: $userName');
-      debugPrint('Organization: $organization');
-      debugPrint('User CreatedAt: $createdAt');
-      debugPrint('User UpdatedAt: $updatedAt');
-      debugPrint('---------------------------');
-
-      // Check for overlapping reservations
       try {
-        final startOfDay = DateTime(
-            startDateTime.year, startDateTime.month, startDateTime.day);
-        final endOfDay = DateTime(
-            startDateTime.year, startDateTime.month, startDateTime.day, 23, 59,
-            59);
-
-        // Query only by roomId to avoid composite index requirement
         final existingBookings = await FirebaseFirestore.instance
             .collection('bookings')
             .where('roomId', isEqualTo: widget.room.id)
@@ -266,35 +219,15 @@ class _ReservePageState extends State<ReservePage> {
 
         for (var doc in existingBookings.docs) {
           final data = doc.data();
-          if (data['status'] == 'cancelled' || data['status'] == 'rejected')
-            continue;
+          if (data['status'] == 'cancelled' || data['status'] == 'rejected') continue;
 
           final existingStart = (data['startTime'] as Timestamp).toDate();
           final existingEnd = (data['endTime'] as Timestamp).toDate();
 
-          // Filter by date first (client-side)
-          if (existingStart.isBefore(startOfDay) ||
-              existingStart.isAfter(endOfDay)) {
-            // If multi-day bookings are allowed, this logic needs to be more complex.
-            // Assuming single-day bookings for now based on current UI.
-            // If not, we just check overlap directly.
-            // Let's just check overlap directly for robustness against any date.
-          }
-
-          // Overlap check: (StartA < EndB) && (EndA > StartB)
-          // Use isBefore/isAfter logic strictly.
-          // Note: isBefore is exclusive. 9:00 is not before 9:00.
-          // New: 9:01 - 10:00. Existing: 7:30 - 9:00.
-          // StartA (9:01) < EndB (9:00) -> False. No overlap.
-          // New: 9:00 - 10:00. Existing: 7:30 - 9:00.
-          // StartA (9:00) < EndB (9:00) -> False. No overlap.
-
-          if (startDateTime.isBefore(existingEnd) &&
-              endDateTime.isAfter(existingStart)) {
+          if (startDateTime.isBefore(existingEnd) && endDateTime.isAfter(existingStart)) {
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                    content: Text('Room already reserved for this time')),
+                SnackBar(content: Text(l10n.get('roomReserved'))),
               );
             }
             return;
@@ -302,16 +235,14 @@ class _ReservePageState extends State<ReservePage> {
         }
       } catch (e) {
         debugPrint('Error checking overlaps: $e');
-        // Optionally handle error, maybe proceed or block. Blocking is safer.
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error checking availability: $e')),
+            SnackBar(content: Text('${l10n.get('somethingWentWrong')}: $e')),
           );
         }
         return;
       }
 
-      // Insert into Firestore
       try {
         final user = FirebaseAuth.instance.currentUser;
         if (user != null) {
@@ -335,15 +266,15 @@ class _ReservePageState extends State<ReservePage> {
         debugPrint('Error inserting booking: $e');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to book room: $e')),
+            SnackBar(content: Text('${l10n.get('failedToBook')}: $e')),
           );
         }
-        return; // Don't close page if failed
+        return;
       }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Reservation Confirmed')),
+          SnackBar(content: Text(l10n.get('reservationConfirmed'))),
         );
         Navigator.pop(context);
       }
@@ -353,13 +284,9 @@ class _ReservePageState extends State<ReservePage> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final colorScheme = Theme
-        .of(context)
-        .colorScheme;
+    final colorScheme = Theme.of(context).colorScheme;
 
-    // Build duration items
-    final int maxDuration = (widget.room
-        .bookingRules['maxDurationMinutes'] as int?) ?? 1440;
+    final int maxDuration = (widget.room.bookingRules['maxDurationMinutes'] as int?) ?? 1440;
     final List<int> durationOptions = [15, 30, 45, 60, 90, 120, 180, 240, 480]
         .where((d) => d <= maxDuration)
         .toList();
@@ -369,267 +296,293 @@ class _ReservePageState extends State<ReservePage> {
         durationOptions.add(_durationMinutes);
         durationOptions.sort();
       } else {
-        // Fallback if current duration exceeds max (shouldn't happen with init logic but safe)
-        _durationMinutes =
-        durationOptions.isNotEmpty ? durationOptions.last : maxDuration;
+        _durationMinutes = durationOptions.isNotEmpty ? durationOptions.last : maxDuration;
         if (!durationOptions.contains(_durationMinutes)) {
           durationOptions.add(_durationMinutes);
         }
       }
     }
 
-    // Advance Booking Info
-    final int advanceDays = (widget.room
-        .bookingRules['advanceBookingDays'] as int?) ?? 0;
-
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Reserve Room'),
-        centerTitle: true,
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.calendar_month_rounded),
-            onPressed: () => _showExistingReservations(context),
-            tooltip: 'View Existing Reservations',
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(20.0),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Room Summary
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: colorScheme.primary.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
+      backgroundColor: const Color(0xFFF5F6FA),
+      body: SafeArea(
+        child: Column(
+          children: [
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Row(
+                children: [
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.arrow_back_ios_new),
+                  ),
+                  Expanded(
+                    child: Text(
+                      l10n.get('reserveRoom'),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
                       ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.meeting_room, color: colorScheme.primary,
-                              size: 40),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  widget.room.name,
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                Text(
-                                  '${widget.room.building} • ${widget.room
-                                      .floor}',
-                                  style: TextStyle(
-                                    color: Colors.grey.shade700,
-                                  ),
-                                ),
-                              ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.history_rounded),
+                    onPressed: () => _showExistingReservations(context),
+                    tooltip: l10n.get('existingReservations'),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20.0),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.04),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
                             ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: colorScheme.primary.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Icon(Icons.meeting_room_rounded, color: colorScheme.primary, size: 30),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    widget.room.name,
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '${widget.room.building} • ${widget.room.floor}',
+                                    style: TextStyle(
+                                      color: Colors.grey.shade600,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      _SectionHeader(title: l10n.get('date')),
+                      const SizedBox(height: 5),
+                      _SelectionTile(
+                        label: l10n.get('selectDate'),
+                        value: DateFormat('EEEE, MMM d, yyyy').format(_selectedDate),
+                        icon: Icons.calendar_today_rounded,
+                        onTap: () => _selectDate(context),
+                      ),
+                      const SizedBox(height: 16),
+                      _SectionHeader(title: l10n.get('startTime')),
+                      const SizedBox(height: 5),
+                      _SelectionTile(
+                        label: l10n.get('selectTime'),
+                        value: _startTime.format(context),
+                        icon: Icons.access_time_rounded,
+                        onTap: () => _selectTime(context),
+                        errorText: _timeError ? '${l10n.get('availability')}: ${widget.room.availability['startTime'] ?? 'N/A'} - ${widget.room.availability['endTime'] ?? 'N/A'}' : null,
+                      ),
+                      const SizedBox(height: 16),
+                      _SectionHeader(title: l10n.get('duration')),
+                      const SizedBox(height: 5),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey.shade200),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButtonFormField<int>(
+                            value: _durationMinutes,
+                            decoration: const InputDecoration(
+                              border: InputBorder.none,
+                              icon: Icon(Icons.timelapse_rounded, color: Colors.blueGrey),
+                            ),
+                            items: durationOptions.map((int value) {
+                              return DropdownMenuItem<int>(
+                                value: value,
+                                child: Text(_formatDuration(value)),
+                              );
+                            }).toList(),
+                            onChanged: (int? newValue) {
+                              setState(() {
+                                _durationMinutes = newValue!;
+                              });
+                            },
+                            validator: (value) {
+                              final min = widget.room.bookingRules['minDurationMinutes'] as int? ?? 0;
+                              final max = widget.room.bookingRules['maxDurationMinutes'] as int? ?? 1440;
+                              if (value! < min && min > 0) return 'Min: ${_formatDuration(min)}';
+                              if (value > max && max > 0) return 'Max: ${_formatDuration(max)}';
+                              return null;
+                            },
                           ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Date Picker
-                    Text('Date', style: Theme
-                        .of(context)
-                        .textTheme
-                        .titleMedium),
-                    const SizedBox(height: 8),
-                    InkWell(
-                      onTap: () => _selectDate(context),
-                      child: InputDecorator(
-                        decoration: const InputDecoration(
-                          border: OutlineInputBorder(),
-                          suffixIcon: Icon(Icons.calendar_today),
                         ),
-                        child: Text(DateFormat('yyyy-MM-dd').format(
-                            _selectedDate)),
                       ),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Time Picker
-                    Text('Start Time', style: Theme
-                        .of(context)
-                        .textTheme
-                        .titleMedium),
-                    const SizedBox(height: 8),
-                    InkWell(
-                      onTap: () => _selectTime(context),
-                      child: InputDecorator(
+                      const SizedBox(height: 16),
+                      _SectionHeader(title: l10n.get('purpose')),
+                      const SizedBox(height: 5),
+                      TextFormField(
+                        controller: _purposeController,
+                        maxLines: 3,
                         decoration: InputDecoration(
-                          border: const OutlineInputBorder(),
-                          suffixIcon: const Icon(Icons.access_time),
-                          errorText: _timeError ? 'Available: ${widget.room
-                              .availability['startTime'] ?? 'N/A'} - ${widget
-                              .room
-                              .availability['endTime'] ?? 'N/A'}' : null,
+                          hintText: l10n.get('meetingWorkshop'),
+                          filled: true,
+                          fillColor: Colors.white,
+                          contentPadding: const EdgeInsets.all(16),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.grey.shade200),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.grey.shade200),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: colorScheme.primary, width: 2),
+                          ),
                         ),
-                        child: Text(_startTime.format(context)),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return l10n.get('enterPurpose');
+                          }
+                          return null;
+                        },
                       ),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Duration
-                    Text('Duration', style: Theme
-                        .of(context)
-                        .textTheme
-                        .titleMedium),
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<int>(
-                      value: _durationMinutes,
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                      ),
-                      items: durationOptions.map((int value) {
-                        return DropdownMenuItem<int>(
-                          value: value,
-                          child: Text(_formatDuration(value)),
-                        );
-                      }).toList(),
-                      onChanged: (int? newValue) {
-                        setState(() {
-                          _durationMinutes = newValue!;
-                        });
-                      },
-                      validator: (value) {
-                        final min = widget.room
-                            .bookingRules['minDurationMinutes'] as int? ?? 0;
-                        final max = widget.room
-                            .bookingRules['maxDurationMinutes'] as int? ?? 1440;
-                        if (value! < min && min > 0)
-                          return 'Minimum duration is ${_formatDuration(min)}';
-                        if (value > max && max > 0)
-                          return 'Maximum duration is ${_formatDuration(max)}';
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Purpose
-                    Text('Purpose', style: Theme
-                        .of(context)
-                        .textTheme
-                        .titleMedium),
-                    const SizedBox(height: 8),
-                    TextFormField(
-                      controller: _purposeController,
-                      decoration: const InputDecoration(
-                        hintText: 'Meeting, Workshop, etc.',
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter a purpose';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 32),
-                  ],
+                      const SizedBox(height: 32),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-
-          // Bottom Container for Button
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-            decoration: BoxDecoration(
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, -5),
-                ),
-              ],
-            ),
-            child: SafeArea(
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+              decoration: BoxDecoration(
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, -5),
+                  ),
+                ],
+              ),
               child: SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: _submitReservation,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: colorScheme.primary,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 18),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
                     elevation: 0,
                   ),
-                  child: const Text(
-                    'Confirm Reservation',
-                    style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white
+                  child: Text(
+                    l10n.get('confirmReservation'),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   void _showExistingReservations(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      backgroundColor: Colors.transparent,
       builder: (context) {
-        return DraggableScrollableSheet(
-          initialChildSize: 0.6,
-          minChildSize: 0.4,
-          maxChildSize: 0.9,
-          expand: false,
-          builder: (context, scrollController) {
-            return Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Existing Reservations',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: DraggableScrollableSheet(
+            initialChildSize: 0.6,
+            minChildSize: 0.4,
+            maxChildSize: 0.9,
+            expand: false,
+            builder: (context, scrollController) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 12),
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  Expanded(
-                    child: _buildExistingReservationsList(scrollController),
-                  ),
-                ],
-              ),
-            );
-          },
+                    const SizedBox(height: 24),
+                    Text(
+                      l10n.get('existingReservations'),
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Expanded(
+                      child: _buildExistingReservationsList(scrollController, l10n),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
         );
       },
     );
   }
 
-  Widget _buildExistingReservationsList(ScrollController scrollController) {
+  Widget _buildExistingReservationsList(ScrollController scrollController, AppLocalizations l10n) {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('bookings')
@@ -637,7 +590,7 @@ class _ReservePageState extends State<ReservePage> {
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return const Text('Error loading reservations');
+          return Center(child: Text(l10n.get('somethingWentWrong')));
         }
 
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -645,13 +598,10 @@ class _ReservePageState extends State<ReservePage> {
         }
 
         final docs = snapshot.data?.docs ?? [];
-        // Filter and sort client-side
         final now = DateTime.now();
         final validBookings = docs.where((doc) {
           final data = doc.data() as Map<String, dynamic>;
-          if (data['status'] == 'cancelled' || data['status'] == 'rejected')
-            return false;
-
+          if (data['status'] == 'cancelled' || data['status'] == 'rejected') return false;
           final endTimestamp = data['endTime'] as Timestamp?;
           if (endTimestamp == null) return false;
           return endTimestamp.toDate().isAfter(now);
@@ -664,9 +614,16 @@ class _ReservePageState extends State<ReservePage> {
         });
 
         if (validBookings.isEmpty) {
-          return const Center(
-            child: Text('No upcoming reservations found.',
-                style: TextStyle(color: Colors.grey)),
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.event_busy_rounded, size: 64, color: Colors.grey.shade200),
+                const SizedBox(height: 16),
+                Text(l10n.get('noUpcomingReservations'),
+                    style: TextStyle(color: Colors.grey.shade500, fontSize: 16)),
+              ],
+            ),
           );
         }
 
@@ -678,29 +635,136 @@ class _ReservePageState extends State<ReservePage> {
             final start = (data['startTime'] as Timestamp).toDate();
             final end = (data['endTime'] as Timestamp).toDate();
 
-            return Card(
+            return Container(
               margin: const EdgeInsets.only(bottom: 12),
-              elevation: 0,
-              color: Colors.grey.shade100,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-              child: ListTile(
-                leading: const Icon(
-                    Icons.access_time_rounded, color: Colors.blueGrey),
-                title: Text(
-                  DateFormat('EEEE, MMM d').format(start),
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
-                subtitle: Text(
-                  '${DateFormat('h:mm a').format(start)} - ${DateFormat(
-                      'h:mm a').format(end)}',
-                  style: TextStyle(color: Colors.grey.shade700),
-                ),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.02),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(Icons.access_time_filled_rounded, color: Colors.blueGrey, size: 20),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          DateFormat('EEEE, MMM d').format(start),
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${DateFormat('h:mm a').format(start)} - ${DateFormat('h:mm a').format(end)}',
+                          style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             );
           },
         );
       },
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  const _SectionHeader({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      title.toUpperCase(),
+      style: TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.bold,
+        color: Colors.grey.shade500,
+        letterSpacing: 1.2,
+      ),
+    );
+  }
+}
+
+class _SelectionTile extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+  final VoidCallback onTap;
+  final String? errorText;
+
+  const _SelectionTile({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.onTap,
+    this.errorText,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: errorText != null ? Colors.red.shade200 : Colors.grey.shade200,
+                width: errorText != null ? 1.5 : 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(icon, color: Colors.blueGrey, size: 22),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    value,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                Icon(Icons.chevron_right_rounded, color: Colors.grey.shade400),
+              ],
+            ),
+          ),
+        ),
+        if (errorText != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8, left: 4),
+            child: Text(
+              errorText!,
+              style: TextStyle(color: Colors.red.shade700, fontSize: 12),
+            ),
+          ),
+      ],
     );
   }
 }

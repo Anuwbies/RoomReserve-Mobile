@@ -98,7 +98,7 @@ class _RoomsPageState extends State<RoomsPage> {
               /* SEARCH BAR & FILTER */
               Container(
                 color: Colors.white,
-                padding: EdgeInsets.fromLTRB(16, topPadding + 12, 16, 12),
+                padding: EdgeInsets.fromLTRB(16, topPadding + 14, 16, 12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
