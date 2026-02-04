@@ -7,6 +7,7 @@ import 'Home_Page.dart';
 import 'Profile_Page.dart';
 import 'Rooms_Page.dart';
 import '../l10n/app_localizations.dart';
+import '../services/fcm_service.dart';
 
 class NavigationBarPage extends StatefulWidget {
   const NavigationBarPage({super.key});
@@ -17,6 +18,12 @@ class NavigationBarPage extends StatefulWidget {
 
 class _NavigationBarPageState extends State<NavigationBarPage> {
   int _selectedIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    FCMService.initialize();
+  }
 
   final List<Widget> _pages = const [
     HomePage(),

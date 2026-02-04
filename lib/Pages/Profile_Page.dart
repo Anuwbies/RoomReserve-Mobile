@@ -4,15 +4,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:provider/provider.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:roomreserve/Pages/Welcome_Page.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:io';
 import '../l10n/app_localizations.dart';
 import '../providers/locale_provider.dart';
+import '../services/fcm_service.dart';
 
 // Assuming these pages exist based on your provided code
 import 'About_Page.dart';
 import 'Faq_Page.dart';
 import 'PrivacyPolicy_Page.dart';
 import 'TermsOfUse_Page.dart';
+import 'Notifications_Page.dart';
 
 // Moved constants to top-level
 const Color _kBackgroundColor = Color(0xFFF3F4F6); // Soft grey bg
@@ -32,6 +37,28 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<void> _logout(BuildContext context) async {
     try {
+      // Delete FCM token from Firestore before logging out
+      final User? user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        String? deviceId;
+        final DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
+        try {
+          if (Platform.isAndroid) {
+            final AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
+            deviceId = androidInfo.id;
+          } else if (Platform.isIOS) {
+            final IosDeviceInfo iosInfo = await deviceInfo.iosInfo;
+            deviceId = iosInfo.identifierForVendor;
+          }
+        } catch (e) {
+          debugPrint('Error getting device ID for logout: $e');
+        }
+
+        if (deviceId != null) {
+          await FCMService.deleteTokenFromFirestore(user.uid, deviceId);
+        }
+      }
+
       await _googleSignIn.signOut();
       await FirebaseAuth.instance.signOut();
 
@@ -472,11 +499,26 @@ class _ProfilePageState extends State<ProfilePage> {
                             _ProfileSection(
                               title: l10n.get('general'),
                               children: [
-                                _ProfileMenuItem(
-                                  icon: Icons.notifications_none_rounded,
-                                  iconColor: Colors.orange,
-                                  title: l10n.get('notifications'),
-                                  onTap: () {},
+                                StreamBuilder<QuerySnapshot>(
+                                  stream: FirebaseFirestore.instance
+                                      .collection('users')
+                                      .doc(user.uid)
+                                      .collection('notifications')
+                                      .where('read', isEqualTo: false)
+                                      .snapshots(),
+                                  builder: (context, snapshot) {
+                                    final int unreadCount = snapshot.hasData ? snapshot.data!.docs.length : 0;
+                                    return _ProfileMenuItem(
+                                      icon: Icons.notifications_none_rounded,
+                                      iconColor: Colors.orange,
+                                      title: l10n.get('notifications'),
+                                      badgeCount: unreadCount,
+                                      onTap: () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(builder: (_) => const NotificationsPage()),
+                                      ),
+                                    );
+                                  },
                                 ),
                                 _ProfileMenuItem(
                                   icon: Icons.language_rounded,
@@ -603,9 +645,23 @@ class _LanguageItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListTile(
       title: Text(name),
-      onTap: () {
+      onTap: () async {
         context.read<LocaleProvider>().setLocale(locale);
-        Navigator.pop(context);
+        
+        // Save language preference to Firestore for backend notifications
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          try {
+            await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+              'languageCode': locale.languageCode,
+              'updatedAt': FieldValue.serverTimestamp(),
+            });
+          } catch (e) {
+            debugPrint("Error saving language to Firestore: $e");
+          }
+        }
+        
+        if (context.mounted) Navigator.pop(context);
       },
       trailing: Localizations.localeOf(context).languageCode == locale.languageCode
           ? const Icon(Icons.check, color: Colors.blue)
@@ -865,6 +921,7 @@ class _ProfileMenuItem extends StatelessWidget {
   final String title;
   final VoidCallback onTap;
   final String? trailingText;
+  final int badgeCount;
   final bool isLast;
 
   const _ProfileMenuItem({
@@ -873,6 +930,7 @@ class _ProfileMenuItem extends StatelessWidget {
     required this.title,
     required this.onTap,
     this.trailingText,
+    this.badgeCount = 0,
     this.isLast = false,
   });
 
@@ -907,13 +965,35 @@ class _ProfileMenuItem extends StatelessWidget {
                   ),
                   const SizedBox(width: 16),
                   Expanded(
-                    child: Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.black87,
-                      ),
+                    child: Row(
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        if (badgeCount > 0) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: const BoxDecoration(
+                              color: _kDangerColor,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Text(
+                              badgeCount > 9 ? '9+' : badgeCount.toString(),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                   if (trailingText != null)

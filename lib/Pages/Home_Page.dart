@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'dart:ui' as ui;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '../l10n/app_localizations.dart';
 import 'BookedDetails_Page.dart';
 import 'Booked_Page.dart';
+import 'components/NoOrganization_Widget.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -82,7 +84,7 @@ class _HomePageState extends State<HomePage> {
                     final allBookings = bookingsSnapshot.data?.docs ?? [];
                     
                     // Stats calculation
-                    int pending = 0, approved = 0, rejected = 0, cancelled = 0;
+                    int pending = 0, approved = 0, declined = 0, cancelled = 0;
                     for (var doc in allBookings) {
                       final data = doc.data() as Map<String, dynamic>;
                       final status = (data['status'] as String? ?? '').toLowerCase();
@@ -90,8 +92,8 @@ class _HomePageState extends State<HomePage> {
                         pending++;
                       } else if (status == 'approved') {
                         approved++;
-                      } else if (status == 'rejected') {
-                        rejected++;
+                      } else if (status == 'declined') {
+                        declined++;
                       } else if (status == 'cancelled') {
                         cancelled++;
                       }
@@ -132,29 +134,61 @@ class _HomePageState extends State<HomePage> {
                     final allRecentActivities = recentActivities;
                     final displayActivities = allRecentActivities.take(5).toList();
 
+                    // Calculate optimal font size for section titles
+                    double sectionTitleFontSize = 18;
+                    final maxWidthForTitle = MediaQuery.of(context).size.width * 0.6;
+                    final safeMaxWidth = maxWidthForTitle - 8; // Safety margin to prevent wrapping
+                    final titlesToCheck = [l10n.get('upcomingReservations'), l10n.get('recentActivity')];
+                    final textScaler = MediaQuery.of(context).textScaler;
+                    
+                    for (final title in titlesToCheck) {
+                      final textPainter = TextPainter(
+                        text: TextSpan(text: title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                        maxLines: 1,
+                        textDirection: ui.TextDirection.ltr,
+                        textScaler: textScaler,
+                      );
+                      textPainter.layout();
+                      if (textPainter.width > safeMaxWidth) {
+                        final newSize = (20 * safeMaxWidth / textPainter.width);
+                        if (newSize < sectionTitleFontSize) {
+                          sectionTitleFontSize = newSize;
+                        }
+                      }
+                    }
+
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         _buildHeader(displayName, user, l10n),
                         const SizedBox(height: 32),
-                        _buildStatsGrid(pending, approved, rejected, cancelled, l10n),
+                        _buildStatsGrid(pending, approved, declined, cancelled, l10n),
                         const SizedBox(height: 32),
-                        _buildSectionTitle(l10n.get('upcomingReservations')),
+                        _buildSectionTitle(l10n.get('upcomingReservations'), fontSize: sectionTitleFontSize),
                         const SizedBox(height: 16),
                         _buildUpcomingReservationsSection(upcomingDocs, l10n),
                         const SizedBox(height: 32),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            _buildSectionTitle(l10n.get('recentActivity')),
-                            TextButton(
-                              onPressed: () => _showAllTodayActivity(context, allRecentActivities, l10n),
-                              style: TextButton.styleFrom(
-                                foregroundColor: const Color(0xFF2563EB),
-                                padding: EdgeInsets.zero,
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            _buildSectionTitle(l10n.get('recentActivity'), fontSize: sectionTitleFontSize),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Align(
+                                alignment: Alignment.centerRight,
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: TextButton(
+                                    onPressed: () => _showAllTodayActivity(context, allRecentActivities, l10n),
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: const Color(0xFF2563EB),
+                                      padding: EdgeInsets.zero,
+                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    ),
+                                    child: Text(l10n.get('seeAll'), style: const TextStyle(fontWeight: FontWeight.w600)),
+                                  ),
+                                ),
                               ),
-                              child: Text(l10n.get('seeAll'), style: const TextStyle(fontWeight: FontWeight.w600)),
                             ),
                           ],
                         ),
@@ -216,7 +250,7 @@ class _HomePageState extends State<HomePage> {
                     const SizedBox(height: 24),
                     Text(
                       l10n.get('todaysActivity'),
-                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 16),
                     Expanded(
@@ -243,23 +277,15 @@ class _HomePageState extends State<HomePage> {
   Widget _buildNoOrgUI(String displayName, User user, AppLocalizations l10n) {
     return Scaffold(
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildHeader(displayName, user, l10n),
-              const Spacer(),
-              Center(
-                child: Text(
-                  l10n.get('noOrgSelectedHome'),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.grey, fontSize: 16),
-                ),
-              ),
-              const Spacer(),
-            ],
-          ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+              child: _buildHeader(displayName, user, l10n),
+            ),
+            const Expanded(child: NoOrganizationWidget()),
+          ],
         ),
       ),
     );
@@ -339,55 +365,73 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildStatsGrid(int pending, int approved, int rejected, int cancelled, AppLocalizations l10n) {
+  Widget _buildStatsGrid(int pending, int approved, int declined, int cancelled, AppLocalizations l10n) {
     return Row(
       children: [
         Expanded(
-          child: _StatCard(
-            title: l10n.get('pending'),
-            count: pending.toString(),
-            color: Colors.orange,
-            icon: Icons.hourglass_top_rounded,
+          child: AspectRatio(
+            aspectRatio: 1,
+            child: _StatCard(
+              title: l10n.get('pending'),
+              count: pending.toString(),
+              color: Colors.orange,
+              icon: Icons.hourglass_top_rounded,
+            ),
           ),
         ),
         const SizedBox(width: 8),
         Expanded(
-          child: _StatCard(
-            title: l10n.get('approved'),
-            count: approved.toString(),
-            color: Colors.green,
-            icon: Icons.check_circle_outline_rounded,
+          child: AspectRatio(
+            aspectRatio: 1,
+            child: _StatCard(
+              title: l10n.get('approved'),
+              count: approved.toString(),
+              color: Colors.green,
+              icon: Icons.check_circle_outline_rounded,
+            ),
           ),
         ),
         const SizedBox(width: 8),
         Expanded(
-          child: _StatCard(
-            title: l10n.get('rejected'),
-            count: rejected.toString(),
-            color: Colors.red,
-            icon: Icons.remove_circle_outline_rounded,
+          child: AspectRatio(
+            aspectRatio: 1,
+            child: _StatCard(
+              title: l10n.get('declined'),
+              count: declined.toString(),
+              color: Colors.red,
+              icon: Icons.remove_circle_outline_rounded,
+            ),
           ),
         ),
         const SizedBox(width: 8),
         Expanded(
-          child: _StatCard(
-            title: l10n.get('cancelled'),
-            count: cancelled.toString(),
-            color: Colors.grey,
-            icon: Icons.cancel_outlined,
+          child: AspectRatio(
+            aspectRatio: 1,
+            child: _StatCard(
+              title: l10n.get('cancelled'),
+              count: cancelled.toString(),
+              color: Colors.grey,
+              icon: Icons.cancel_outlined,
+            ),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildSectionTitle(String title) {
-    return Text(
-      title,
-      style: const TextStyle(
-        fontSize: 20,
-        fontWeight: FontWeight.bold,
-        color: Colors.black87,
+  Widget _buildSectionTitle(String title, {double fontSize = 20}) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    return SizedBox(
+      width: screenWidth * 0.7,
+      child: Text(
+        title,
+        maxLines: 1,
+        softWrap: false,
+        style: TextStyle(
+          fontSize: fontSize,
+          fontWeight: FontWeight.bold,
+          color: Colors.black87,
+        ),
       ),
     );
   }
@@ -669,7 +713,7 @@ class _StatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(16),
@@ -679,30 +723,44 @@ class _StatCard extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                count,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
+          SizedBox(
+            height: 24, // Fixed height for count area
+            child: Center(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      count,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(icon, color: color, size: 16),
+                  ],
                 ),
               ),
-              const SizedBox(width: 4),
-              Icon(icon, color: color, size: 16),
-            ],
+            ),
           ),
           const SizedBox(height: 4),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              title,
-              style: TextStyle(
-                fontSize: 11,
-                color: color.withValues(alpha: 0.8),
-                fontWeight: FontWeight.w600,
+          SizedBox(
+            height: 14, // Fixed height for title area
+            child: Center(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: color.withValues(alpha: 0.8),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
             ),
           ),
@@ -743,8 +801,8 @@ class _RecentActivityItem extends StatelessWidget {
       title = l10n.get('bookingApproved');
       icon = Icons.check_rounded;
       color = Colors.green;
-    } else if (status == 'rejected') {
-      title = l10n.get('bookingRejected');
+    } else if (status == 'declined') {
+      title = l10n.get('bookingDeclined');
       icon = Icons.close_rounded;
       color = Colors.red;
     } else if (status == 'cancelled') {
@@ -769,63 +827,80 @@ class _RecentActivityItem extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       child: Padding(
         padding: const EdgeInsets.only(bottom: 16),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Center(
+                  child: Icon(icon, color: color, size: 22),
+                ),
               ),
-              child: Icon(icon, color: color, size: 22),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black87,
-                            fontSize: 15,
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87,
+                                fontSize: 14,
+                              ),
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        _getTimeAgo(createdAt),
+                        const SizedBox(width: 8),
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            _getTimeAgo(createdAt),
+                            style: TextStyle(
+                                color: Colors.grey.shade400,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        '${data['roomName']} • ${_getLocalizedFloorRecent(data['floor'] ?? '', l10n)} • ${data['purpose'] ?? l10n.get('noPurpose')}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                            color: Colors.grey.shade400,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500
+                          color: Colors.grey.shade600,
+                          fontSize: 12,
+                          height: 1.2,
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${data['roomName']} • ${_getLocalizedFloorRecent(data['floor'] ?? '', l10n)} • ${data['purpose'] ?? l10n.get('noPurpose')}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: Colors.grey.shade600,
-                      fontSize: 13,
-                      height: 1.3,
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

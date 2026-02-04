@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../l10n/app_localizations.dart';
 import 'BookedDetails_Page.dart';
 import 'dart:async';
+import 'components/NoOrganization_Widget.dart';
 
 class BookedPage extends StatefulWidget {
   const BookedPage({super.key});
@@ -82,7 +83,7 @@ class _BookedPageState extends State<BookedPage>
         if (organizationName == null || organizationName.isEmpty) {
           return Scaffold(
             appBar: AppBar(title: Text(l10n.get('booked'))),
-            body: Center(child: Text(l10n.get('noOrgSelectedHome'))),
+            body: const NoOrganizationWidget(),
           );
         }
 
@@ -110,7 +111,7 @@ class _BookedPageState extends State<BookedPage>
                 _MinWidthTab(text: l10n.get('approved')),
                 _MinWidthTab(text: l10n.get('completed')),
                 _MinWidthTab(text: l10n.get('cancelled')),
-                _MinWidthTab(text: l10n.get('rejected')),
+                _MinWidthTab(text: l10n.get('declined')),
               ],
             ),
           ),
@@ -159,7 +160,7 @@ class _BookedPageState extends State<BookedPage>
                       _buildBookingStream('Approved', organizationName, l10n),
                       _buildBookingStream('Completed', organizationName, l10n),
                       _buildBookingStream('Cancelled', organizationName, l10n),
-                      _buildBookingStream('Rejected', organizationName, l10n),
+                      _buildBookingStream('Declined', organizationName, l10n),
                     ],
                   ),
                 ),
@@ -216,7 +217,7 @@ class _BookedPageState extends State<BookedPage>
           'approved': 1,
           'completed': 2,
           'cancelled': 3,
-          'rejected': 4,
+          'declined': 4,
         };
 
         bookings.sort((a, b) {
@@ -291,9 +292,9 @@ class BookingCard extends StatelessWidget {
     return Card(
       elevation: 0,
       color: Colors.white,
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 16),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(20),
         side: BorderSide(color: Colors.grey.shade200),
       ),
       child: Padding(
@@ -334,7 +335,7 @@ class BookingCard extends StatelessWidget {
                   const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
                     color: statusColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: statusColor.withValues(alpha: 0.2)),
                   ),
                   child: Text(
@@ -422,7 +423,7 @@ class BookingCard extends StatelessWidget {
         return Colors.green;
       case 'cancelled':
         return Colors.red;
-      case 'rejected':
+      case 'declined':
         return Colors.red.shade900;
       case 'completed':
         return Colors.blueGrey;

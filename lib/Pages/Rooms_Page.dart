@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'dart:ui' as ui;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:async'; // Import for Timer
 import 'RoomDetails_Page.dart'; // Import Details Page
 import '../l10n/app_localizations.dart';
+import 'components/NoOrganization_Widget.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,6 +20,10 @@ Future<void> main() async {
 
 class RoomsPage extends StatefulWidget {
   const RoomsPage({super.key});
+
+  // Base font sizes to maintain "Always 2 bigger" relationship
+  static const double detailFontSize = 14.0;
+  static const double headerFontSize = detailFontSize + 1.0;
 
   @override
   State<RoomsPage> createState() => _RoomsPageState();
@@ -130,6 +136,8 @@ class _RoomsPageState extends State<RoomsPage> {
                         padding: const EdgeInsets.only(bottom: 8.0, left: 4),
                         child: Text(
                           organizationName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
@@ -241,32 +249,7 @@ class _RoomsPageState extends State<RoomsPage> {
     final l10n = AppLocalizations.of(context);
 
     if (organizationName == null || organizationName.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.business_outlined,
-                  size: 64, color: Colors.grey.shade300),
-              const SizedBox(height: 16),
-              Text(
-                l10n.get('noOrgSelected'),
-                style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                l10n.get('selectOrgPrompt'),
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.grey),
-              ),
-            ],
-          ),
-        ),
-      );
+      return const NoOrganizationWidget();
     }
 
     return StreamBuilder<QuerySnapshot>(
@@ -614,7 +597,7 @@ class RoomTypeCard extends StatelessWidget {
       color: Colors.white,
       margin: const EdgeInsets.only(bottom: 16),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(20),
         side: BorderSide(color: Colors.grey.shade200),
       ),
       child: Padding(
@@ -622,17 +605,41 @@ class RoomTypeCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Padding(
-              padding: const EdgeInsets.only(top: 10, bottom: 5),
-              child: Text(
-                localizedType,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            Column(
+                        Padding(
+                          padding: const EdgeInsets.only(top: 10, bottom: 5),
+                          child: LayoutBuilder(
+                            builder: (context, constraints) {
+                              final maxWidth = constraints.maxWidth;
+                              double fontSize = RoomsPage.headerFontSize;
+                              final textScaler = MediaQuery.of(context).textScaler;
+                              
+                              final textPainter = TextPainter(
+                                text: TextSpan(
+                                  text: localizedType,
+                                  style: const TextStyle(fontSize: RoomsPage.headerFontSize, fontWeight: FontWeight.w600),
+                                ),
+                                maxLines: 1,
+                                textDirection: ui.TextDirection.ltr,
+                                textScaler: textScaler,
+                              );
+                              textPainter.layout();
+                              
+                              if (textPainter.width > maxWidth) {
+                                fontSize = (RoomsPage.headerFontSize * maxWidth / textPainter.width);
+                              }
+            
+                              return Text(
+                                localizedType,
+                                maxLines: 1,
+                                softWrap: false,
+                                style: TextStyle(
+                                  fontSize: fontSize,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              );
+                            },
+                          ),
+                        ),            Column(
               children: List.generate(rooms.length, (index) {
                 final isLast = index == rooms.length - 1;
 
@@ -706,7 +713,7 @@ class _RoomRow extends StatelessWidget {
           width: 74,
           decoration: BoxDecoration(
             color: colorScheme.primary.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(
             Icons.meeting_room,
@@ -718,24 +725,27 @@ class _RoomRow extends StatelessWidget {
         Expanded(
           child: SizedBox(
             height: 74,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      room.name,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                      ),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+              Row(
+                children: [
+                  Text(
+                    room.name,
+                    style: const TextStyle(
+                      fontSize: RoomsPage.detailFontSize,
+                      fontWeight: FontWeight.w600,
                     ),
+                  ),
                     const SizedBox(width: 6),
                     Text(
                       _getLocalizedRoomType(room.type, l10n),
                       style: const TextStyle(
-                        fontSize: 13,
+                        fontSize: 14,
                         color: Colors.grey,
                       ),
                     ),
@@ -744,11 +754,11 @@ class _RoomRow extends StatelessWidget {
                 Text(
                   '${room.building} • ${_getLocalizedFloor(room.floor, l10n)}',
                   style: const TextStyle(
-                    fontSize: 13,
+                    fontSize: 14,
                     color: Colors.grey,
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 8),
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
@@ -761,12 +771,12 @@ class _RoomRow extends StatelessWidget {
                         ),
                         decoration: BoxDecoration(
                           border: Border.all(color: availabilityColor),
-                          borderRadius: BorderRadius.circular(6),
+                          borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
                           availabilityLabel,
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 12,
                             fontWeight: FontWeight.w500,
                             color: availabilityColor,
                           ),
@@ -781,7 +791,7 @@ class _RoomRow extends StatelessWidget {
                         ),
                         decoration: BoxDecoration(
                           border: Border.all(color: borderColor),
-                          borderRadius: BorderRadius.circular(6),
+                          borderRadius: BorderRadius.circular(8),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -794,7 +804,7 @@ class _RoomRow extends StatelessWidget {
                             const SizedBox(width: 4),
                             Text(
                               tag.label,
-                              style: const TextStyle(fontSize: 11),
+                              style: const TextStyle(fontSize: 12),
                             ),
                           ],
                         ),
@@ -808,12 +818,12 @@ class _RoomRow extends StatelessWidget {
                           ),
                           decoration: BoxDecoration(
                             border: Border.all(color: borderColor),
-                            borderRadius: BorderRadius.circular(6),
+                            borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
                             '+${room.tags.length - 1}',
                             style: const TextStyle(
-                              fontSize: 11,
+                              fontSize: 12,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -823,7 +833,8 @@ class _RoomRow extends StatelessWidget {
                 ),
               ],
             ),
-          ),
+            ),
+            ),
         ),
       ],
     );

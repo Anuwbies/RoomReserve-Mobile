@@ -130,7 +130,7 @@ class _ReservePageState extends State<ReservePage> {
       for (var doc in existingBookings.docs) {
         final data = doc.data();
         final String status = (data['status'] as String).toLowerCase();
-        if (status == 'cancelled' || status == 'rejected' || status == 'completed') continue;
+        if (status == 'cancelled' || status == 'declined' || status == 'completed') continue;
 
         final existingStart = (data['startTime'] as Timestamp).toDate();
         final existingEnd = (data['endTime'] as Timestamp).toDate();
@@ -304,7 +304,7 @@ class _ReservePageState extends State<ReservePage> {
         for (var doc in existingBookings.docs) {
           final data = doc.data();
           final String s = (data['status'] as String).toLowerCase();
-          if (s == 'cancelled' || s == 'rejected' || s == 'completed') continue;
+          if (s == 'cancelled' || s == 'declined' || s == 'completed') continue;
 
           final existingStart = (data['startTime'] as Timestamp).toDate();
           final existingEnd = (data['endTime'] as Timestamp).toDate();
@@ -339,6 +339,7 @@ class _ReservePageState extends State<ReservePage> {
             'purpose': _purposeController.text,
             'status': status,
             'createdAt': FieldValue.serverTimestamp(),
+            'upcomingNotifSent': false,
           });
         }
       } catch (e) {
@@ -685,8 +686,8 @@ class _ReservePageState extends State<ReservePage> {
         final validBookings = docs.where((doc) {
           final data = doc.data() as Map<String, dynamic>;
           final String status = (data['status'] as String).toLowerCase();
-          // Exclude cancelled, rejected, and completed bookings.
-          if (status == 'cancelled' || status == 'rejected' || status == 'completed') return false;
+          // Exclude cancelled, declined, and completed bookings.
+          if (status == 'cancelled' || status == 'declined' || status == 'completed') return false;
           final endTimestamp = data['endTime'] as Timestamp?;
           if (endTimestamp == null) return false;
           return endTimestamp.toDate().isAfter(now);

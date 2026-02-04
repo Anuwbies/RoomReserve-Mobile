@@ -426,7 +426,7 @@ class _BookedDetailsPageState extends State<BookedDetailsPage> {
       case 'pending': return Colors.orange;
       case 'approved': return Colors.green;
       case 'cancelled': return Colors.red;
-      case 'rejected': return Colors.red.shade900;
+      case 'declined': return Colors.red.shade900;
       case 'completed': return Colors.blueGrey;
       default: return Colors.blueGrey;
     }
@@ -437,7 +437,7 @@ class _BookedDetailsPageState extends State<BookedDetailsPage> {
       case 'pending': return Icons.hourglass_empty_rounded;
       case 'approved': return Icons.check_circle_outline_rounded;
       case 'cancelled': return Icons.cancel_outlined;
-      case 'rejected': return Icons.error_outline_rounded;
+      case 'declined': return Icons.error_outline_rounded;
       case 'completed': return Icons.task_alt_rounded;
       default: return Icons.info_outline_rounded;
     }
