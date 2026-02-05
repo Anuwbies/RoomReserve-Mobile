@@ -1,8 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:roomreserve/Pages/Welcome_Page.dart';
@@ -34,6 +36,78 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   static final GoogleSignIn _googleSignIn = GoogleSignIn();
+
+  Future<void> _pickAndUploadImage() async {
+    final picker = ImagePicker();
+    final l10n = AppLocalizations.of(context);
+    
+    try {
+      debugPrint("ProfileUpdate: Starting image pick from gallery...");
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 512,
+        maxHeight: 512,
+        imageQuality: 85,
+      );
+
+      if (image == null) return;
+
+      if (!mounted) return;
+      
+      // Show loading indicator
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.get('uploadingImage') ?? 'Uploading image...')),
+      );
+
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      // 1. Delete old image if it exists in Firebase Storage
+      if (user.photoURL != null && user.photoURL!.contains('firebasestorage.googleapis.com')) {
+        try {
+          final oldPhotoRef = FirebaseStorage.instance.refFromURL(user.photoURL!);
+          await oldPhotoRef.delete();
+        } catch (e) {
+          debugPrint("Note: Could not delete old profile picture: $e");
+        }
+      }
+
+      final String fileName = "${user.displayName ?? 'User'}'s Profile_${user.uid}";
+      final storageRef = FirebaseStorage.instance
+          .ref()
+          .child('profile_pictures')
+          .child('$fileName.jpg');
+
+      // 2. Upload file
+      await storageRef.putFile(File(image.path));
+
+      // Get download URL
+      final String downloadUrl = await storageRef.getDownloadURL();
+
+      // Update Firebase Auth profile
+      await user.updatePhotoURL(downloadUrl);
+
+      // Update Firestore users collection
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+        'photoURL': downloadUrl,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      if (mounted) {
+        setState(() {}); // Refresh UI
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.get('imageUploaded') ?? 'Profile picture updated!')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error uploading image: $e')),
+        );
+      }
+    }
+  }
 
   Future<void> _logout(BuildContext context) async {
     try {
@@ -491,6 +565,7 @@ class _ProfilePageState extends State<ProfilePage> {
                               membershipStatus: status,
                               onSelectOrganization: () => _selectOrganization(user),
                               onLeaveOrCancel: () => _confirmLeaveOrCancel(context, membershipId, status),
+                              onEditPhoto: _pickAndUploadImage,
                             ),
 
                             const SizedBox(height: 24),
@@ -678,6 +753,7 @@ class _ProfileHeader extends StatelessWidget {
   final String? membershipStatus;
   final VoidCallback onSelectOrganization;
   final VoidCallback onLeaveOrCancel;
+  final VoidCallback onEditPhoto;
 
   const _ProfileHeader({
     required this.photoUrl,
@@ -687,6 +763,7 @@ class _ProfileHeader extends StatelessWidget {
     required this.membershipStatus,
     required this.onSelectOrganization,
     required this.onLeaveOrCancel,
+    required this.onEditPhoto,
   });
 
   @override
@@ -727,58 +804,61 @@ class _ProfileHeader extends StatelessWidget {
 
     return Column(
       children: [
-        Stack(
-          children: [
-            Container(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 4),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
-                    blurRadius: 10,
-                    offset: const Offset(0, 5),
-                  ),
-                ],
-              ),
-              child: CircleAvatar(
-                radius: 50,
-                backgroundColor: Colors.grey.shade200,
-                backgroundImage: photoUrl != null && photoUrl!.isNotEmpty
-                    ? NetworkImage(photoUrl!)
-                    : null,
-                child: photoUrl == null || photoUrl!.isEmpty
-                    ? SvgPicture.asset(
-                  'lib/assets/images/profile.svg',
-                  width: 60,
-                  height: 60,
-                  colorFilter: const ColorFilter.mode(
-                    Colors.grey,
-                    BlendMode.srcIn,
-                  ),
-                )
-                    : null,
-              ),
-            ),
-            Positioned(
-              bottom: 0,
-              right: 0,
-              child: Container(
-                height: 32,
-                width: 32,
+        GestureDetector(
+          onTap: onEditPhoto,
+          child: Stack(
+            children: [
+              Container(
                 decoration: BoxDecoration(
-                  color: _kPrimaryColor,
                   shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 2),
+                  border: Border.all(color: Colors.white, width: 4),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.1),
+                      blurRadius: 10,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
                 ),
-                child: const Icon(
-                  Icons.edit,
-                  size: 16,
-                  color: Colors.white,
+                child: CircleAvatar(
+                  radius: 50,
+                  backgroundColor: Colors.grey.shade200,
+                  backgroundImage: photoUrl != null && photoUrl!.isNotEmpty
+                      ? NetworkImage(photoUrl!)
+                      : null,
+                  child: photoUrl == null || photoUrl!.isEmpty
+                      ? SvgPicture.asset(
+                    'lib/assets/images/profile.svg',
+                    width: 60,
+                    height: 60,
+                    colorFilter: const ColorFilter.mode(
+                      Colors.grey,
+                      BlendMode.srcIn,
+                    ),
+                  )
+                      : null,
                 ),
               ),
-            ),
-          ],
+              Positioned(
+                bottom: 0,
+                right: 0,
+                child: Container(
+                  height: 32,
+                  width: 32,
+                  decoration: BoxDecoration(
+                    color: _kPrimaryColor,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 2),
+                  ),
+                  child: const Icon(
+                    Icons.edit,
+                    size: 16,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 16),
         Text(

@@ -1,0 +1,44 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper: Is the user authenticated?
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Users collection
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if request.auth.uid == userId;
+      
+      match /fcmTokens/{tokenId} {
+        allow read, write: if request.auth.uid == userId;
+      }
+      match /notifications/{notifId} {
+        allow read, write: if request.auth.uid == userId;
+      }
+    }
+
+    // Memberships collection
+    match /memberships/{membershipId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if false; // Only via Admin/Functions for safety, or refine as needed
+    }
+
+    // Bookings collection
+    match /bookings/{bookingId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || request.auth.token.admin == true);
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    // Rooms (Public Data)
+    match /artifacts/default-app-id/public/data/rooms/{roomId} {
+      allow read: if isAuthenticated();
+      allow write: if false; // Only via Admin/Console
+    }
+  }
+}

@@ -1,4 +1,4 @@
-const functions = require("firebase-functions");
+const functions = require("firebase-functions/v1");
 const admin = require("firebase-admin");
 
 admin.initializeApp();
@@ -29,6 +29,12 @@ const translations = {
     "upcoming_title": "Upcoming Reservation",
     "upcoming_body": (name, time) =>
       `Your reservation for ${name} starts at ${time}.`,
+    "session_starting_title": "Session Starting Now",
+    "session_starting_body": (name) =>
+      `Your session in ${name} is starting. You can head there now!`,
+    "session_ending_title": "10-Minute Warning",
+    "session_ending_body": (name) =>
+      `Your session in ${name} will end in 10 minutes.`,
     "room_added_title": "New Room Available!",
     "room_added_body": (name) =>
       `${name} has been added to the list of available rooms.`,
@@ -55,6 +61,12 @@ const translations = {
     "upcoming_title": "間もなく開始される予約",
     "upcoming_body": (name, time) =>
       `${name}の予約が${time}に開始されます。`,
+    "session_starting_title": "セッション開始",
+    "session_starting_body": (name) =>
+      `${name}でのセッションが始まります。移動してください。`,
+    "session_ending_title": "あと10分で終了",
+    "session_ending_body": (name) =>
+      `${name}でのセッションはあと10分で終了します。`,
     "room_added_title": "新しい部屋が追加されました！",
     "room_added_body": (name) =>
       `${name}が利用可能な部屋に追加されました。`,
@@ -78,6 +90,12 @@ const translations = {
       `${name}에서의 세션이 종료되었습니다. 감사합니다!`,
     "upcoming_title": "예정된 예약",
     "upcoming_body": (name, time) => `${name} 예약이 ${time}에 시작됩니다.`,
+    "session_starting_title": "세션 시작됨",
+    "session_starting_body": (name) =>
+      `${name} 세션이 시작됩니다. 지금 이동하세요!`,
+    "session_ending_title": "10분 전 알림",
+    "session_ending_body": (name) =>
+      `${name} 세션이 10분 후에 종료됩니다.`,
     "room_added_title": "새로운 방 이용 가능!",
     "room_added_body": (name) =>
       `${name}이(가) 이용 가능한 방 목록에 추가되었습니다.`,
@@ -105,6 +123,12 @@ const translations = {
     "upcoming_title": "Darating na Reservasyon",
     "upcoming_body": (name, time) =>
       `Ang reservasyon para sa ${name} ay magsisimula sa ganap na ${time}.`,
+    "session_starting_title": "Magsisimula na ang Session",
+    "session_starting_body": (name) =>
+      `Magsisimula na ang iyong session sa ${name}. Maaari ka nang pumunta!`,
+    "session_ending_title": "10-Minutong Paalala",
+    "session_ending_body": (name) =>
+      `Matatapos na ang iyong session sa ${name} sa loob ng 10 minuto.`,
     "room_added_title": "May Bagong Silid!",
     "room_added_body": (name) =>
       `Ang ${name} ay naidagdag na sa listahan ng mga bakanteng silid.`,
@@ -343,6 +367,92 @@ exports.notifyUpcomingReservations = functions.pubsub
             });
 
         await sendPush(userId, title, body, "upcoming_booking");
+      }
+
+      return null;
+    });
+
+/**
+ * Trigger: Runs every 5 minutes to find starting and ending bookings.
+ */
+exports.notifyBookingReminders = functions.pubsub
+    .schedule("every 5 minutes")
+    .onRun(async (context) => {
+      const now = admin.firestore.Timestamp.now();
+      const in5Mins = admin.firestore.Timestamp.fromMillis(
+          now.toMillis() + 5 * 60 * 1000,
+      );
+      const in15Mins = admin.firestore.Timestamp.fromMillis(
+          now.toMillis() + 15 * 60 * 1000,
+      );
+      const in10Mins = admin.firestore.Timestamp.fromMillis(
+          now.toMillis() + 10 * 60 * 1000,
+      );
+
+      const bookingsRef = admin.firestore().collection("bookings");
+
+      // 1. Session Starting Now (starts in the next 5 mins)
+      const startingSoon = await bookingsRef
+          .where("status", "==", "approved")
+          .where("startTime", "<=", in5Mins)
+          .where("startTime", ">", now)
+          .where("startNotifSent", "==", false)
+          .get();
+
+      for (const doc of startingSoon.docs) {
+        const data = doc.data();
+        const userId = data.userId;
+        const roomName = data.roomName || "Room";
+        const lang = await getUserLang(userId);
+        const t = translations[lang] || translations["en"];
+
+        const title = t.session_starting_title;
+        const body = t.session_starting_body(roomName);
+
+        await doc.ref.update({startNotifSent: true});
+        await admin.firestore()
+            .collection("users").doc(userId)
+            .collection("notifications").add({
+              title, body,
+              titleKey: "notif_session_starting_title",
+              bodyKey: "notif_session_starting_body",
+              type: "booking",
+              createdAt: admin.firestore.FieldValue.serverTimestamp(),
+              read: false,
+            });
+        await sendPush(userId, title, body, "session_starting");
+      }
+
+      // 2. 10-Minute Warning (ends in the next 10-15 mins)
+      const endingSoon = await bookingsRef
+          .where("status", "==", "approved")
+          .where("endTime", "<=", in15Mins)
+          .where("endTime", ">", in10Mins)
+          .where("endNotifSent", "==", false)
+          .get();
+
+      for (const doc of endingSoon.docs) {
+        const data = doc.data();
+        const userId = data.userId;
+        const roomName = data.roomName || "Room";
+        const lang = await getUserLang(userId);
+        const t = translations[lang] || translations["en"];
+
+        const title = t.session_ending_title;
+        const body = t.session_ending_body(roomName);
+
+        await doc.ref.update({endNotifSent: true});
+        await admin.firestore()
+            .collection("users").doc(userId)
+            .collection("notifications").add({
+              title, body,
+              titleKey: "notif_session_ending_title",
+              bodyKey: "notif_session_ending_body",
+              type: "booking",
+              createdAt: admin.firestore.FieldValue.serverTimestamp(),
+              read: false,
+            });
+        await sendPush(userId, title, body, "session_ending");
       }
 
       return null;
