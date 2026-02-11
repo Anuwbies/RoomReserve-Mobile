@@ -36,6 +36,7 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   static final GoogleSignIn _googleSignIn = GoogleSignIn();
+  bool _isUploading = false;
 
   Future<void> _pickAndUploadImage() async {
     final picker = ImagePicker();
@@ -54,13 +55,30 @@ class _ProfilePageState extends State<ProfilePage> {
 
       if (!mounted) return;
       
+      setState(() {
+        _isUploading = true;
+      });
+
       // Show loading indicator
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.get('uploadingImage') ?? 'Uploading image...')),
+        SnackBar(
+          content: Text(
+            l10n.get('uploadingImage') ?? 'Uploading image...',
+            textAlign: TextAlign.center,
+          ),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          margin: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+        ),
       );
 
       final user = FirebaseAuth.instance.currentUser;
-      if (user == null) return;
+      if (user == null) {
+        setState(() {
+          _isUploading = false;
+        });
+        return;
+      }
 
       // 1. Delete old image if it exists in Firebase Storage
       if (user.photoURL != null && user.photoURL!.contains('firebasestorage.googleapis.com')) {
@@ -94,16 +112,36 @@ class _ProfilePageState extends State<ProfilePage> {
       });
 
       if (mounted) {
-        setState(() {}); // Refresh UI
+        setState(() {
+          _isUploading = false;
+        }); // Refresh UI
         ScaffoldMessenger.of(context).hideCurrentSnackBar();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.get('imageUploaded') ?? 'Profile picture updated!')),
+          SnackBar(
+            content: Text(
+              l10n.get('imageUploaded') ?? 'Profile picture updated!',
+              textAlign: TextAlign.center,
+            ),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+            margin: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
+        setState(() {
+          _isUploading = false;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error uploading image: $e')),
+          SnackBar(
+            content: Text('Error: $e', textAlign: TextAlign.center),
+            backgroundColor: _kDangerColor,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+            margin: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+          ),
         );
       }
     }
@@ -144,7 +182,13 @@ class _ProfilePageState extends State<ProfilePage> {
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Logout failed: $e')),
+        SnackBar(
+          content: Text('Logout failed: $e', textAlign: TextAlign.center),
+          backgroundColor: _kDangerColor,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          margin: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+        ),
       );
     }
   }
@@ -231,7 +275,7 @@ class _ProfilePageState extends State<ProfilePage> {
         }
       } else {
         if (currentOrg.isNotEmpty) {
-          // Sync: User is NOT approved (pending/kicked/left) but has org name in user doc
+          // Sync: User is NOT approved (pending/removed/left) but has org name in user doc
           await FirebaseFirestore.instance.collection('users').doc(userId).update({
             'organizationName': '',
             'updatedAt': FieldValue.serverTimestamp(),
@@ -246,7 +290,7 @@ class _ProfilePageState extends State<ProfilePage> {
     
     final l10n = AppLocalizations.of(context);
     final isPending = status == 'pending';
-    final isKicked = status == 'kicked';
+    final isRemoved = status == 'removed';
     final isDeclined = status == 'declined';
     
     String title = l10n.get('leaveOrgTitle');
@@ -257,9 +301,9 @@ class _ProfilePageState extends State<ProfilePage> {
       title = l10n.get('cancelRequestTitle');
       message = l10n.get('cancelRequestMessage');
       actionLabel = l10n.get('cancelRequestAction');
-    } else if (isKicked) {
+    } else if (isRemoved) {
       title = l10n.get('dismissNoticeTitle');
-      message = l10n.get('kickedNoticeMessage');
+      message = l10n.get('removedNoticeMessage');
       actionLabel = l10n.get('dismissAction');
     } else if (isDeclined) {
       title = l10n.get('dismissNoticeTitle');
@@ -298,18 +342,33 @@ class _ProfilePageState extends State<ProfilePage> {
     if (confirm == true) {
       try {
         await FirebaseFirestore.instance.collection('memberships').doc(membershipId).update({
-          'status': isPending ? 'cancelled' : 'left', // Kicked/Declined -> Left (to clear from view)
+          'status': isPending ? 'cancelled' : 'left', // Removed/Declined -> Left (to clear from view)
           'updatedAt': FieldValue.serverTimestamp(),
         });
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-             SnackBar(content: Text(isPending ? l10n.get('requestCancelled') : (isKicked || isDeclined ? l10n.get('notificationDismissed') : l10n.get('leftOrganization')))),
+             SnackBar(
+               content: Text(
+                 isPending ? l10n.get('requestCancelled') : (isRemoved || isDeclined ? l10n.get('notificationDismissed') : l10n.get('leftOrganization')),
+                 textAlign: TextAlign.center,
+               ),
+               backgroundColor: Colors.green,
+               behavior: SnackBarBehavior.floating,
+               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+               margin: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+             ),
           );
         }
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: $e')),
+            SnackBar(
+              content: Text('Error: $e', textAlign: TextAlign.center),
+              backgroundColor: _kDangerColor,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+              margin: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+            ),
           );
         }
       }
@@ -430,7 +489,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                 await FirebaseFirestore.instance.collection('memberships').add({
                                   'joinedAt': FieldValue.serverTimestamp(),
                                   'organizationName': orgName,
-                                  'role': 'member',
+                                  'role': 'user',
                                   'status': 'pending',
                                   'updatedAt': FieldValue.serverTimestamp(),
                                   'name': userName,
@@ -441,13 +500,25 @@ class _ProfilePageState extends State<ProfilePage> {
                               if (mounted) {
                                 Navigator.pop(context);
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text(l10n.get('membershipRequestSent'))),
+                                  SnackBar(
+                                    content: Text(l10n.get('membershipRequestSent'), textAlign: TextAlign.center),
+                                    backgroundColor: Colors.green,
+                                    behavior: SnackBarBehavior.floating,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                                    margin: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+                                  ),
                                 );
                               }
                             } catch (e) {
                               if (mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Failed to send request: $e')),
+                                  SnackBar(
+                                    content: Text('Failed to send request: $e', textAlign: TextAlign.center),
+                                    backgroundColor: _kDangerColor,
+                                    behavior: SnackBarBehavior.floating,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                                    margin: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+                                  ),
                                 );
                               }
                             }
@@ -524,7 +595,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     stream: FirebaseFirestore.instance
                         .collection('memberships')
                         .where('userId', isEqualTo: user.uid)
-                        .where('status', whereIn: ['pending', 'approved', 'kicked', 'declined'])
+                        .where('status', whereIn: ['pending', 'approved', 'removed', 'declined'])
                         .limit(1)
                         .snapshots(),
                     builder: (context, membershipSnapshot) {
@@ -566,6 +637,7 @@ class _ProfilePageState extends State<ProfilePage> {
                               onSelectOrganization: () => _selectOrganization(user),
                               onLeaveOrCancel: () => _confirmLeaveOrCancel(context, membershipId, status),
                               onEditPhoto: _pickAndUploadImage,
+                              isUploading: _isUploading,
                             ),
 
                             const SizedBox(height: 24),
@@ -754,6 +826,7 @@ class _ProfileHeader extends StatelessWidget {
   final VoidCallback onSelectOrganization;
   final VoidCallback onLeaveOrCancel;
   final VoidCallback onEditPhoto;
+  final bool isUploading;
 
   const _ProfileHeader({
     required this.photoUrl,
@@ -764,13 +837,14 @@ class _ProfileHeader extends StatelessWidget {
     required this.onSelectOrganization,
     required this.onLeaveOrCancel,
     required this.onEditPhoto,
+    required this.isUploading,
   });
 
   @override
   Widget build(BuildContext context) {
     final bool hasOrg = organizationName != null && organizationName!.isNotEmpty;
     final bool isPending = membershipStatus == 'pending';
-    final bool isKicked = membershipStatus == 'kicked';
+    final bool isRemoved = membershipStatus == 'removed';
     final bool isDeclined = membershipStatus == 'declined';
     final l10n = AppLocalizations.of(context);
 
@@ -785,8 +859,8 @@ class _ProfileHeader extends StatelessWidget {
         statusColor = Colors.orange.shade800;
         bgColor = Colors.orange.shade50;
         borderColor = Colors.orange.shade200;
-      } else if (isKicked) {
-        statusText = l10n.get('kicked');
+      } else if (isRemoved) {
+        statusText = l10n.get('removed');
         statusColor = _kDangerColor;
         bgColor = Colors.red.shade50;
         borderColor = _kDangerColor.withValues(alpha: 0.3);
@@ -850,11 +924,19 @@ class _ProfileHeader extends StatelessWidget {
                     shape: BoxShape.circle,
                     border: Border.all(color: Colors.white, width: 2),
                   ),
-                  child: const Icon(
-                    Icons.edit,
-                    size: 16,
-                    color: Colors.white,
-                  ),
+                  child: isUploading
+                      ? const Padding(
+                          padding: EdgeInsets.all(6.0),
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : const Icon(
+                          Icons.edit,
+                          size: 16,
+                          color: Colors.white,
+                        ),
                 ),
               ),
             ],
@@ -932,7 +1014,7 @@ class _ProfileHeader extends StatelessWidget {
                   if (hasOrg) ...[
                     const SizedBox(width: 6),
                     Icon(
-                      isPending ? Icons.close_rounded : (isKicked || isDeclined ? Icons.delete_outline : Icons.logout_rounded),
+                      isPending ? Icons.close_rounded : (isRemoved || isDeclined ? Icons.delete_outline : Icons.logout_rounded),
                       size: 16,
                       color: statusColor,
                     ),

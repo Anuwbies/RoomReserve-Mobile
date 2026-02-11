@@ -16,6 +16,7 @@ class BookedDetailsPage extends StatefulWidget {
 
 class _BookedDetailsPageState extends State<BookedDetailsPage> {
   bool _isRoomDescriptionExpanded = false;
+  bool _isFeaturesExpanded = false;
 
   @override
   Widget build(BuildContext context) {
@@ -220,6 +221,7 @@ class _BookedDetailsPageState extends State<BookedDetailsPage> {
     final String displayDescription = !_isRoomDescriptionExpanded && isDescriptionLong 
         ? "${room.description.substring(0, 150)}..." 
         : room.description;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -237,6 +239,24 @@ class _BookedDetailsPageState extends State<BookedDetailsPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Container(
+            height: 120,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: colorScheme.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+              image: room.photoURL != null && room.photoURL!.isNotEmpty
+                  ? DecorationImage(
+                      image: NetworkImage(room.photoURL!),
+                      fit: BoxFit.cover,
+                    )
+                  : null,
+            ),
+            child: room.photoURL == null || room.photoURL!.isEmpty
+                ? Icon(Icons.meeting_room_rounded, color: colorScheme.primary, size: 48)
+                : null,
+          ),
+          const SizedBox(height: 20),
           Text(
             room.name,
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -286,15 +306,38 @@ class _BookedDetailsPageState extends State<BookedDetailsPage> {
           ],
           if (room.tags.isNotEmpty) ...[
             const Divider(height: 32),
-            Text(
-              l10n.get('features'),
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  l10n.get('features'),
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+                if (room.tags.length > 4)
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _isFeaturesExpanded = !_isFeaturesExpanded;
+                      });
+                    },
+                    child: Text(
+                      _isFeaturesExpanded ? l10n.get('seeLess') : l10n.get('seeMore'),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).primaryColor,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: 12),
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: room.tags.map((tag) => _buildFeatureChip(tag, l10n)).toList(),
+              children: (_isFeaturesExpanded ? room.tags : room.tags.take(4))
+                  .map((tag) => _buildFeatureChip(tag, l10n))
+                  .toList(),
             ),
           ],
         ],
@@ -353,11 +396,6 @@ class _BookedDetailsPageState extends State<BookedDetailsPage> {
   }
 
   Widget _buildFeatureChip(RoomTag tag, AppLocalizations l10n) {
-    String l10nKey = tag.label.toLowerCase().replaceAll(' ', '').replaceAll('-', '').replaceAll('.', '');
-    if (l10nKey == 'laboratoryeqpt') l10nKey = 'labEqpt';
-    if (l10nKey == 'soundsystem') l10nKey = 'soundSystem';
-    if (l10nKey == 'aircon') l10nKey = 'aircon';
-    
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
@@ -371,7 +409,7 @@ class _BookedDetailsPageState extends State<BookedDetailsPage> {
           Icon(tag.icon, size: 14, color: Colors.grey.shade700),
           const SizedBox(width: 6),
           Text(
-            l10n.get(l10nKey),
+            l10n.getFeature(tag.label),
             style: TextStyle(fontSize: 12, color: Colors.grey.shade800, fontWeight: FontWeight.w500),
           ),
         ],
@@ -389,13 +427,7 @@ class _BookedDetailsPageState extends State<BookedDetailsPage> {
   }
 
   String _getLocalizedFloor(String floor, AppLocalizations l10n) {
-    String f = floor.toLowerCase().replaceAll(' ', '');
-    if (f.contains('ground')) return l10n.get('groundFloor');
-    if (f.contains('1st')) return l10n.get('1stFloor');
-    if (f.contains('2nd')) return l10n.get('2ndFloor');
-    if (f.contains('3rd')) return l10n.get('3rdFloor');
-    if (f.contains('4th')) return l10n.get('4thFloor');
-    return floor;
+    return l10n.getFloor(floor);
   }
 
   String _getLocalizedRoomType(String type, AppLocalizations l10n) {

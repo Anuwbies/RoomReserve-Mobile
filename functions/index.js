@@ -226,7 +226,7 @@ exports.onMembershipStatusChange = functions.firestore
         body = t.org_declined_body(orgName);
         titleKey = "notif_org_declined_title";
         bodyKey = "notif_org_declined_body";
-      } else if (newData.status === "kicked") {
+      } else if (newData.status === "removed") {
         title = t.org_kicked_title;
         body = t.org_kicked_body(orgName);
         titleKey = "notif_org_removed_title";

@@ -132,7 +132,13 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.get('sampleNotifAdded'))),
+        SnackBar(
+          content: Text(l10n.get('sampleNotifAdded'), textAlign: TextAlign.center),
+          backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          margin: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+        ),
       );
     }
   }

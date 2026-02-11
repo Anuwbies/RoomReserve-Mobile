@@ -273,13 +273,7 @@ class BookingCard extends StatelessWidget {
   const BookingCard({super.key, required this.booking});
 
   String _getLocalizedFloor(String floor, AppLocalizations l10n) {
-    String f = floor.toLowerCase().replaceAll(' ', '');
-    if (f.contains('ground')) return l10n.get('groundFloor');
-    if (f.contains('1st')) return l10n.get('1stFloor');
-    if (f.contains('2nd')) return l10n.get('2ndFloor');
-    if (f.contains('3rd')) return l10n.get('3rdFloor');
-    if (f.contains('4th')) return l10n.get('4thFloor');
-    return floor;
+    return l10n.getFloor(floor);
   }
 
   @override
@@ -371,13 +365,25 @@ class BookingCard extends StatelessWidget {
                       });
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(l10n.get('requestCancelled'))),
+                          SnackBar(
+                            content: Text(l10n.get('requestCancelled'), textAlign: TextAlign.center),
+                            backgroundColor: Colors.green,
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                            margin: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+                          ),
                         );
                       }
                     } catch (e) {
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text("${l10n.get('somethingWentWrong')}: $e")),
+                          SnackBar(
+                            content: Text("${l10n.get('somethingWentWrong')}: $e", textAlign: TextAlign.center),
+                            backgroundColor: Colors.red,
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                            margin: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+                          ),
                         );
                       }
                     }

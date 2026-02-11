@@ -44,12 +44,13 @@ class _LoginPageState extends State<LoginPage> {
         await userDoc.set({
           'name': user.displayName ?? 'Unknown User',
           'email': user.email,
-          'role': 'student',      // Default role
-          'organizationName': '',     // Default organization
-          'isActive': true,       // Added to match RegisterPage
-          'isEmailVerified': user.emailVerified, // Added to match RegisterPage
+          'organizationName': '', // Default organization
+          'isEmailVerified': user.emailVerified,
+          'languageCode': 'en',
+          'photoURL': user.photoURL,
+          'platform': 'mobile',
           'createdAt': FieldValue.serverTimestamp(),
-          'updatedAt': FieldValue.serverTimestamp(), // Added to match RegisterPage
+          'updatedAt': FieldValue.serverTimestamp(),
         });
       }
     } catch (e) {
@@ -158,6 +159,9 @@ class _LoginPageState extends State<LoginPage> {
           message,
           textAlign: TextAlign.center,
         ),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        margin: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
       ),
     );
   }

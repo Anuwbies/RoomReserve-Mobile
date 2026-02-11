@@ -67,10 +67,11 @@ class _RegisterPageState extends State<RegisterPage> {
         await userDoc.set({
           'name': fullName,
           'email': user.email,
-          'role': 'student', // Default role
           'organizationName': '', // Default organization is blank
-          'isActive': true,
           'isEmailVerified': user.emailVerified,
+          'languageCode': 'en',
+          'photoURL': null,
+          'platform': 'mobile',
           'createdAt': FieldValue.serverTimestamp(),
           'updatedAt': FieldValue.serverTimestamp(),
         });
@@ -197,6 +198,9 @@ class _RegisterPageState extends State<RegisterPage> {
           message,
           textAlign: TextAlign.center,
         ),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        margin: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
       ),
     );
   }

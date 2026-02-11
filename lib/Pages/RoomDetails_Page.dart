@@ -16,6 +16,7 @@ class RoomDetailsPage extends StatefulWidget {
 
 class _RoomDetailsPageState extends State<RoomDetailsPage> {
   bool _isDescriptionExpanded = false;
+  bool _isFeaturesExpanded = false;
   late DateTime _now;
   bool _isOnlineTime = false;
 
@@ -85,21 +86,11 @@ class _RoomDetailsPageState extends State<RoomDetailsPage> {
     final formattedDate = DateFormat('EEEE, MMM d • hh:mm a', locale).format(_now);
 
     String getLocalizedFeature(String feature) {
-      String l10nKey = feature.toLowerCase().replaceAll(' ', '').replaceAll('-', '').replaceAll('.', '');
-      if (l10nKey == 'laboratoryeqpt') l10nKey = 'labEqpt';
-      if (l10nKey == 'soundsystem') l10nKey = 'soundSystem';
-      if (l10nKey == 'aircon') l10nKey = 'aircon';
-      return l10n.get(l10nKey);
+      return l10n.getFeature(feature);
     }
 
     String getLocalizedFloor(String floor) {
-      String f = floor.toLowerCase().replaceAll(' ', '');
-      if (f.contains('ground')) return l10n.get('groundFloor');
-      if (f.contains('1st')) return l10n.get('1stFloor');
-      if (f.contains('2nd')) return l10n.get('2ndFloor');
-      if (f.contains('3rd')) return l10n.get('3rdFloor');
-      if (f.contains('4th')) return l10n.get('4thFloor');
-      return floor;
+      return l10n.getFloor(floor);
     }
 
     String getLocalizedRoomType(String type) {
@@ -159,26 +150,36 @@ class _RoomDetailsPageState extends State<RoomDetailsPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      width: double.infinity,
-                      height: 200,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            colorScheme.primary.withValues(alpha: 0.15),
-                            colorScheme.primary.withValues(alpha: 0.05),
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
+                    AspectRatio(
+                      aspectRatio: 1,
+                      child: Container(
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              colorScheme.primary.withValues(alpha: 0.15),
+                              colorScheme.primary.withValues(alpha: 0.05),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(20),
+                          image: room.photoURL != null && room.photoURL!.isNotEmpty
+                              ? DecorationImage(
+                                  image: NetworkImage(room.photoURL!),
+                                  fit: BoxFit.cover,
+                                )
+                              : null,
                         ),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Center(
-                        child: Icon(
-                          Icons.meeting_room_rounded,
-                          size: 80,
-                          color: colorScheme.primary,
-                        ),
+                        child: room.photoURL == null || room.photoURL!.isEmpty
+                            ? Center(
+                                child: Icon(
+                                  Icons.meeting_room_rounded,
+                                  size: 80,
+                                  color: colorScheme.primary,
+                                ),
+                              )
+                            : null,
                       ),
                     ),
                     const SizedBox(height: 10),
@@ -480,12 +481,33 @@ class _RoomDetailsPageState extends State<RoomDetailsPage> {
                     ),
                     const SizedBox(height: 28),
                     if (room.tags.isNotEmpty) ...[
-                      _SectionHeader(title: l10n.get('features')),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          _SectionHeader(title: l10n.get('features')),
+                          if (room.tags.length > 4)
+                            GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  _isFeaturesExpanded = !_isFeaturesExpanded;
+                                });
+                              },
+                              child: Text(
+                                _isFeaturesExpanded ? l10n.get('seeLess') : l10n.get('seeMore'),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: colorScheme.primary,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
                       const SizedBox(height: 12),
                       Wrap(
                         spacing: 8,
                         runSpacing: 10,
-                        children: room.tags.map((tag) {
+                        children: ( _isFeaturesExpanded ? room.tags : room.tags.take(4)).map((tag) {
                           return Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                             decoration: BoxDecoration(

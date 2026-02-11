@@ -33,6 +33,8 @@ class _RoomsPageState extends State<RoomsPage> {
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
   late Stream<DocumentSnapshot> _userStream;
+  Stream<QuerySnapshot>? _roomsStream;
+  String? _currentOrgName;
   Timer? _debounce; // Timer for debounce
 
   // Filter States
@@ -66,6 +68,17 @@ class _RoomsPageState extends State<RoomsPage> {
     }
   }
 
+  void _updateRoomsStream(String organizationName) {
+    if (_currentOrgName == organizationName && _roomsStream != null) return;
+    setState(() {
+      _currentOrgName = organizationName;
+      _roomsStream = FirebaseFirestore.instance
+          .collection('rooms')
+          .where('organizationName', isEqualTo: organizationName)
+          .snapshots();
+    });
+  }
+
   Future<void> _signInAnonymously() async {
     if (FirebaseAuth.instance.currentUser == null) {
       await FirebaseAuth.instance.signInAnonymously();
@@ -90,13 +103,7 @@ class _RoomsPageState extends State<RoomsPage> {
   }
 
   String _getLocalizedFloor(String floor, AppLocalizations l10n) {
-    String f = floor.toLowerCase().replaceAll(' ', '');
-    if (f.contains('ground')) return l10n.get('groundFloor');
-    if (f.contains('1st')) return l10n.get('1stFloor');
-    if (f.contains('2nd')) return l10n.get('2ndFloor');
-    if (f.contains('3rd')) return l10n.get('3rdFloor');
-    if (f.contains('4th')) return l10n.get('4thFloor');
-    return floor;
+    return l10n.getFloor(floor);
   }
 
   @override
@@ -121,6 +128,12 @@ class _RoomsPageState extends State<RoomsPage> {
           final userData =
               userDocSnapshot.data?.data() as Map<String, dynamic>?;
           final organizationName = userData?['organizationName'] as String?;
+
+          if (organizationName != null && organizationName.isNotEmpty) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _updateRoomsStream(organizationName);
+            });
+          }
 
           return Column(
             children: [
@@ -252,58 +265,88 @@ class _RoomsPageState extends State<RoomsPage> {
       return const NoOrganizationWidget();
     }
 
+    if (_roomsStream == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('rooms')
-          .where('organizationName', isEqualTo: organizationName)
-          .snapshots(),
+      stream: _roomsStream,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return Center(child: Text('Error: ${snapshot.error}'));
         }
 
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
 
-        final allRooms = snapshot.data!.docs.map((doc) {
+        final allRooms = snapshot.data?.docs.map((doc) {
           return Room.fromFirestore(doc);
-        }).toList();
+        }).toList() ?? [];
 
         // Update dynamic filter values for the UI
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            final newTypes = allRooms.map((r) => r.type).toSet().toList()..sort();
-            final newBuildings = allRooms.map((r) => r.building).toSet().toList()..sort();
-            final newFloors = allRooms.map((r) => r.floor).toSet().toList()..sort();
-            final newAvailabilities = allRooms
-                .map((r) => r.isAvailable ? l10n.get('available') : l10n.get('occupied'))
-                .toSet()
-                .toList()
-              ..sort();
+        if (allRooms.isNotEmpty) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              final newTypes = allRooms.map((r) => r.type).toSet().toList()..sort();
+              final newBuildings = allRooms.map((r) => r.building).toSet().toList()..sort();
+              final newFloors = allRooms.map((r) => r.floor).toSet().toList()
+                ..sort((a, b) => _getFloorPriority(a).compareTo(_getFloorPriority(b)));
+              final newAvailabilities = allRooms
+                  .map((r) => r.isAvailable ? l10n.get('available') : l10n.get('occupied'))
+                  .toSet()
+                  .toList()
+                ..sort();
 
-            if (newTypes.length != _types.length || 
-                newBuildings.length != _buildings.length || 
-                newFloors.length != _floors.length ||
-                newAvailabilities.length != _availabilities.length) {
-              setState(() {
-                _types = newTypes;
-                _buildings = newBuildings;
-                _floors = newFloors;
-                _availabilities = newAvailabilities;
-              });
+              if (newTypes.length != _types.length || 
+                  newBuildings.length != _buildings.length || 
+                  newFloors.length != _floors.length ||
+                  newAvailabilities.length != _availabilities.length) {
+                setState(() {
+                  _types = newTypes;
+                  _buildings = newBuildings;
+                  _floors = newFloors;
+                  _availabilities = newAvailabilities;
+                });
+              }
             }
-          }
-        });
-
-        final filteredRooms = _filterRooms(allRooms, _query);
-        final groupedRooms = _groupRoomsByType(filteredRooms);
-
-        if (filteredRooms.isEmpty && _query.isEmpty && !_hasActiveFilters()) {
-          return const Center(child: CircularProgressIndicator());
+          });
         }
 
-        if (filteredRooms.isEmpty) {
+        final filteredRooms = _filterRooms(allRooms, _query);
+
+        // Sort rooms: Building -> Floor -> Name -> Type (Stable sort)
+        filteredRooms.sort((a, b) {
+          int cmp = a.building.compareTo(b.building);
+          if (cmp != 0) return cmp;
+
+          cmp = _getFloorPriority(a.floor).compareTo(_getFloorPriority(b.floor));
+          if (cmp != 0) return cmp;
+
+          cmp = a.name.compareTo(b.name);
+          if (cmp != 0) return cmp;
+
+          return a.type.compareTo(b.type);
+        });
+
+        final groupedRooms = _groupRoomsByLocation(filteredRooms);
+
+        if (allRooms.isEmpty && snapshot.connectionState == ConnectionState.active) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.meeting_room_outlined,
+                    size: 48, color: Colors.grey),
+                const SizedBox(height: 16),
+                Text(l10n.get('noRoomsFound'),
+                    style: const TextStyle(color: Colors.grey)),
+              ],
+            ),
+          );
+        }
+
+        if (filteredRooms.isEmpty && _query.isNotEmpty) {
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -318,14 +361,18 @@ class _RoomsPageState extends State<RoomsPage> {
           );
         }
 
+        if (snapshot.connectionState == ConnectionState.waiting && allRooms.isEmpty) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
         return ListView.builder(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
           itemCount: groupedRooms.length,
           itemBuilder: (context, index) {
             final entry =
                 groupedRooms.entries.elementAt(index);
-            return RoomTypeCard(
-              type: entry.key,
+            return RoomLocationCard(
+              building: entry.key,
               rooms: entry.value,
             );
           },
@@ -350,6 +397,28 @@ class _RoomsPageState extends State<RoomsPage> {
       _selectedBuilding = null;
       _selectedFloor = null;
     });
+  }
+
+  int _getFloorPriority(String floor) {
+    final f = floor.toLowerCase();
+    if (f.contains('basement')) return -1;
+    if (f.contains('ground')) return 0;
+    
+    final match = RegExp(r'(\d+)').firstMatch(f);
+    if (match != null) return int.tryParse(match.group(1)!) ?? 999;
+    
+    if (f.contains('roof')) return 10000;
+    return 9999;
+  }
+
+  Map<String, List<Room>> _groupRoomsByLocation(List<Room> rooms) {
+    final Map<String, List<Room>> grouped = {};
+    for (final room in rooms) {
+      // Group by Building only
+      final key = room.building;
+      grouped.putIfAbsent(key, () => []).add(room);
+    }
+    return grouped;
   }
 
   List<Room> _filterRooms(List<Room> rooms, String query) {
@@ -377,14 +446,6 @@ class _RoomsPageState extends State<RoomsPage> {
 
       return true;
     }).toList();
-  }
-
-  Map<String, List<Room>> _groupRoomsByType(List<Room> rooms) {
-    final Map<String, List<Room>> grouped = {};
-    for (final room in rooms) {
-      grouped.putIfAbsent(room.type, () => []).add(room);
-    }
-    return grouped;
   }
 
   /* ===================== UI HELPERS ===================== */
@@ -570,27 +631,21 @@ class _RoomsPageState extends State<RoomsPage> {
   }
 }
 
-/* ===================== TYPE CARD ===================== */
+/* ===================== LOCATION CARD ===================== */
 
-class RoomTypeCard extends StatelessWidget {
-  final String type;
+class RoomLocationCard extends StatelessWidget {
+  final String building;
   final List<Room> rooms;
 
-  const RoomTypeCard({
+  const RoomLocationCard({
     super.key,
-    required this.type,
+    required this.building,
     required this.rooms,
   });
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final l10n = AppLocalizations.of(context);
-
-    // Localize room type for display
-    String key = type.toLowerCase().replaceAll(' ', '');
-    String localizedType = l10n.get(key);
-    if (localizedType == key) localizedType = capitalizeFirst(type);
 
     return Card(
       elevation: 0,
@@ -615,7 +670,7 @@ class RoomTypeCard extends StatelessWidget {
                               
                               final textPainter = TextPainter(
                                 text: TextSpan(
-                                  text: localizedType,
+                                  text: building,
                                   style: const TextStyle(fontSize: RoomsPage.headerFontSize, fontWeight: FontWeight.w600),
                                 ),
                                 maxLines: 1,
@@ -629,7 +684,7 @@ class RoomTypeCard extends StatelessWidget {
                               }
             
                               return Text(
-                                localizedType,
+                                building,
                                 maxLines: 1,
                                 softWrap: false,
                                 style: TextStyle(
@@ -682,13 +737,7 @@ class _RoomRow extends StatelessWidget {
   });
 
   String _getLocalizedFloor(String floor, AppLocalizations l10n) {
-    String f = floor.toLowerCase().replaceAll(' ', '');
-    if (f.contains('ground')) return l10n.get('groundFloor');
-    if (f.contains('1st')) return l10n.get('1stFloor');
-    if (f.contains('2nd')) return l10n.get('2ndFloor');
-    if (f.contains('3rd')) return l10n.get('3rdFloor');
-    if (f.contains('4th')) return l10n.get('4thFloor');
-    return floor;
+    return l10n.getFloor(floor);
   }
 
   String _getLocalizedRoomType(String type, AppLocalizations l10n) {
@@ -714,12 +763,20 @@ class _RoomRow extends StatelessWidget {
           decoration: BoxDecoration(
             color: colorScheme.primary.withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(12),
+            image: room.photoURL != null && room.photoURL!.isNotEmpty
+                ? DecorationImage(
+                    image: NetworkImage(room.photoURL!),
+                    fit: BoxFit.cover,
+                  )
+                : null,
           ),
-          child: Icon(
-            Icons.meeting_room,
-            size: 32,
-            color: colorScheme.primary,
-          ),
+          child: room.photoURL == null || room.photoURL!.isEmpty
+              ? Icon(
+                  Icons.meeting_room,
+                  size: 32,
+                  color: colorScheme.primary,
+                )
+              : null,
         ),
         const SizedBox(width: 10),
         Expanded(
@@ -752,7 +809,7 @@ class _RoomRow extends StatelessWidget {
                   ],
                 ),
                 Text(
-                  '${room.building} • ${_getLocalizedFloor(room.floor, l10n)}',
+                  '${_getLocalizedFloor(room.floor, l10n)} • ${l10n.get('capacity')}: ${room.capacity}',
                   style: const TextStyle(
                     fontSize: 14,
                     color: Colors.grey,
@@ -803,7 +860,7 @@ class _RoomRow extends StatelessWidget {
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              tag.label,
+                              l10n.getFeature(tag.label),
                               style: const TextStyle(fontSize: 12),
                             ),
                           ],
@@ -856,6 +913,7 @@ class Room {
   final String floor;
   final bool isAvailable;
   final List<RoomTag> tags;
+  final String? photoURL;
   final String description;
   final int capacity;
   final Map<String, dynamic> bookingRules;
@@ -869,6 +927,7 @@ class Room {
     required this.floor,
     required this.isAvailable,
     required this.tags,
+    this.photoURL,
     required this.description,
     required this.capacity,
     required this.bookingRules,
@@ -908,6 +967,7 @@ class Room {
       floor: floor,
       isAvailable: isAvailable,
       tags: parsedTags,
+      photoURL: data['photoURL'],
       description: data['description'] ?? '',
       capacity: data['capacity'] ?? 0,
       bookingRules: data['bookingRules'] as Map<String, dynamic>? ?? {},
@@ -918,15 +978,40 @@ class Room {
 
 // Helper to map string features from DB to Icons
 IconData _getIconForFeature(String feature) {
-  final f = feature.toLowerCase();
+  final f = feature.toLowerCase().replaceAll(' ', '').replaceAll('-', '');
+  
+  if (f.contains('accessibility')) return Icons.accessible;
   if (f.contains('projector')) return Icons.videocam;
-  if (f.contains('ac') || f.contains('air-con')) return Icons.ac_unit;
+  if (f.contains('ac')) return Icons.ac_unit;
   if (f.contains('whiteboard')) return Icons.edit_square;
-  if (f.contains('tv')) return Icons.tv;
+  if (f.contains('chalkboard')) return Icons.gesture;
+  if (f.contains('smartboard')) return Icons.developer_board;
   if (f.contains('wifi')) return Icons.wifi;
-  if (f.contains('computer') || f.contains('pc')) return Icons.computer;
-  if (f.contains('sound') || f.contains('speaker')) return Icons.speaker;
+  if (f.contains('computer') || f.contains('pc') || f.contains('desktop')) return Icons.computer;
+  if (f.contains('sound') || f.contains('speaker') || f.contains('microphone')) return Icons.volume_up;
+  if (f.contains('podium')) return Icons.co_present;
+  if (f.contains('webcam')) return Icons.camera_indoor;
+  if (f.contains('cable') || f.contains('adapter')) return Icons.cable;
+  if (f.contains('ethernet')) return Icons.settings_ethernet;
+  if (f.contains('outlet') || f.contains('power')) return Icons.power;
+  if (f.contains('printer') || f.contains('scanner')) return Icons.print;
+  if (f.contains('desk')) return Icons.desk;
+  if (f.contains('furniture') || f.contains('chair') || f.contains('table')) return Icons.chair;
+  if (f.contains('water')) return Icons.water_drop;
+  if (f.contains('aid')) return Icons.medical_services;
+  if (f.contains('fire-extinguisher')) return Icons.fire_extinguisher;
+  if (f.contains('sink')) return Icons.wash;
+  if (f.contains('hood')) return Icons.vaping_rooms;
+  if (f.contains('microscope')) return Icons.biotech;
+  if (f.contains('tool')) return Icons.handyman;
+  if (f.contains('light') || f.contains('window')) return Icons.wb_sunny;
+  if (f.contains('curtain')) return Icons.curtains;
+  if (f.contains('soundproofing')) return Icons.hearing_disabled;
+  if (f.contains('camera')) return Icons.videocam;
+  if (f.contains('conferencing')) return Icons.video_call;
+  if (f.contains('locker') || f.contains('storage')) return Icons.lock;
   if (f.contains('lab') || f.contains('equipment')) return Icons.science;
+  
   return Icons.star_outline;
 }
 

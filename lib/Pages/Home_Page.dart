@@ -17,13 +17,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   String _getLocalizedFloor(String floor, AppLocalizations l10n) {
-    String f = floor.toLowerCase().replaceAll(' ', '');
-    if (f.contains('ground')) return l10n.get('groundFloor');
-    if (f.contains('1st')) return l10n.get('1stFloor');
-    if (f.contains('2nd')) return l10n.get('2ndFloor');
-    if (f.contains('3rd')) return l10n.get('3rdFloor');
-    if (f.contains('4th')) return l10n.get('4thFloor');
-    return floor;
+    return l10n.getFloor(floor);
   }
 
   String _getFormattedDate(BuildContext context) {
@@ -907,13 +901,7 @@ class _RecentActivityItem extends StatelessWidget {
   }
 
   String _getLocalizedFloorRecent(String floor, AppLocalizations l10n) {
-    String f = floor.toLowerCase().replaceAll(' ', '');
-    if (f.contains('ground')) return l10n.get('groundFloor');
-    if (f.contains('1st')) return l10n.get('1stFloor');
-    if (f.contains('2nd')) return l10n.get('2ndFloor');
-    if (f.contains('3rd')) return l10n.get('3rdFloor');
-    if (f.contains('4th')) return l10n.get('4thFloor');
-    return floor;
+    return l10n.getFloor(floor);
   }
 }
 

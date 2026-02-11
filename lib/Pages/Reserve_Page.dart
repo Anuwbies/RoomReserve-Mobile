@@ -21,10 +21,17 @@ class _ReservePageState extends State<ReservePage> {
   late int _durationMinutes;
   final TextEditingController _purposeController = TextEditingController();
   String? _timeErrorMessage;
+  late Stream<QuerySnapshot> _existingBookingsStream;
+  bool _isSubmitting = false;
 
   @override
   void initState() {
     super.initState();
+    _existingBookingsStream = FirebaseFirestore.instance
+        .collection('bookings')
+        .where('roomId', isEqualTo: widget.room.id)
+        .snapshots();
+
     // 1. Initialize Date: Find first valid date
     final List<int> allowedDays = (widget.room
         .availability['daysOfWeek'] as List<dynamic>?)?.cast<int>() ?? [];
@@ -156,13 +163,7 @@ class _ReservePageState extends State<ReservePage> {
   }
 
   String _getLocalizedFloor(String floor, AppLocalizations l10n) {
-    String f = floor.toLowerCase().replaceAll(' ', '');
-    if (f.contains('ground')) return l10n.get('groundFloor');
-    if (f.contains('1st')) return l10n.get('1stFloor');
-    if (f.contains('2nd')) return l10n.get('2ndFloor');
-    if (f.contains('3rd')) return l10n.get('3rdFloor');
-    if (f.contains('4th')) return l10n.get('4thFloor');
-    return floor;
+    return l10n.getFloor(floor);
   }
 
   String _formatDuration(int minutes, AppLocalizations l10n) {
@@ -259,12 +260,21 @@ class _ReservePageState extends State<ReservePage> {
     // Final UI check
     if (_timeErrorMessage != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_timeErrorMessage!)),
+        SnackBar(
+          content: Text(_timeErrorMessage!, textAlign: TextAlign.center),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          margin: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+        ),
       );
       return;
     }
 
     if (_formKey.currentState!.validate()) {
+      setState(() {
+        _isSubmitting = true;
+      });
+
       final startDateTime = DateTime(
         _selectedDate.year,
         _selectedDate.month,
@@ -311,8 +321,16 @@ class _ReservePageState extends State<ReservePage> {
 
           if (startDateTime.isBefore(existingEnd) && endDateTime.isAfter(existingStart)) {
             if (mounted) {
+              setState(() {
+                _isSubmitting = false;
+              });
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(l10n.get('timeOverlap'))),
+                SnackBar(
+                  content: Text(l10n.get('timeOverlap'), textAlign: TextAlign.center),
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                  margin: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+                ),
               );
             }
             return;
@@ -345,16 +363,33 @@ class _ReservePageState extends State<ReservePage> {
       } catch (e) {
         debugPrint('Error inserting booking: $e');
         if (mounted) {
+          setState(() {
+            _isSubmitting = false;
+          });
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('${l10n.get('failedToBook')}: $e')),
+            SnackBar(
+              content: Text('${l10n.get('failedToBook')}: $e', textAlign: TextAlign.center),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+              margin: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+            ),
           );
         }
         return;
       }
 
       if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.get('reservationConfirmed'))),
+          SnackBar(
+            content: Text(l10n.get('reservationConfirmed'), textAlign: TextAlign.center),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+            margin: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+          ),
         );
         Navigator.pop(context);
       }
@@ -440,12 +475,21 @@ class _ReservePageState extends State<ReservePage> {
                         child: Row(
                           children: [
                             Container(
-                              padding: const EdgeInsets.all(12),
+                              height: 64,
+                              width: 64,
                               decoration: BoxDecoration(
                                 color: colorScheme.primary.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(12),
+                                image: widget.room.photoURL != null && widget.room.photoURL!.isNotEmpty
+                                    ? DecorationImage(
+                                        image: NetworkImage(widget.room.photoURL!),
+                                        fit: BoxFit.cover,
+                                      )
+                                    : null,
                               ),
-                              child: Icon(Icons.meeting_room_rounded, color: colorScheme.primary, size: 30),
+                              child: widget.room.photoURL == null || widget.room.photoURL!.isEmpty
+                                  ? Icon(Icons.meeting_room_rounded, color: colorScheme.primary, size: 30)
+                                  : null,
                             ),
                             const SizedBox(width: 16),
                             Expanded(
@@ -583,23 +627,34 @@ class _ReservePageState extends State<ReservePage> {
               child: SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _submitReservation,
+                  onPressed: _isSubmitting ? null : _submitReservation,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: colorScheme.primary,
                     foregroundColor: Colors.white,
+                    disabledBackgroundColor: colorScheme.primary.withValues(alpha: 0.6),
                     padding: const EdgeInsets.symmetric(vertical: 18),
+                    minimumSize: const Size(double.infinity, 56),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
                     elevation: 0,
                   ),
-                  child: Text(
-                    l10n.get('confirmReservation'),
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  child: _isSubmitting
+                      ? const SizedBox(
+                          height: 24,
+                          width: 24,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2.5,
+                          ),
+                        )
+                      : Text(
+                          l10n.get('confirmReservation'),
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                 ),
               ),
             ),
@@ -622,17 +677,16 @@ class _ReservePageState extends State<ReservePage> {
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
           child: DraggableScrollableSheet(
-            initialChildSize: 0.6,
-            minChildSize: 0.4,
-            maxChildSize: 0.9,
+            initialChildSize: 0.7,
+            minChildSize: 0.5,
+            maxChildSize: 0.95,
             expand: false,
             builder: (context, scrollController) {
               return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                padding: const EdgeInsets.all(24.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(height: 12),
                     Center(
                       child: Container(
                         width: 40,
@@ -647,7 +701,7 @@ class _ReservePageState extends State<ReservePage> {
                     Text(
                       l10n.get('existingReservations'),
                       style: const TextStyle(
-                        fontSize: 22,
+                        fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -668,10 +722,7 @@ class _ReservePageState extends State<ReservePage> {
   Widget _buildExistingReservationsList(ScrollController scrollController, AppLocalizations l10n) {
     final locale = Localizations.localeOf(context).toString();
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('bookings')
-          .where('roomId', isEqualTo: widget.room.id)
-          .snapshots(),
+      stream: _existingBookingsStream,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return Center(child: Text(l10n.get('somethingWentWrong')));
