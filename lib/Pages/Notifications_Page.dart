@@ -324,11 +324,11 @@ class _NotificationsPageState extends State<NotificationsPage> {
                     onPressed: () => Navigator.pop(context),
                     icon: const Icon(Icons.arrow_back_ios_new),
                   ),
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'Notifications',
+                      l10n.get('notifications'),
                       textAlign: TextAlign.center,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w700,
                       ),
@@ -375,7 +375,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                               size: 64, color: Colors.grey.shade300),
                           const SizedBox(height: 16),
                           Text(
-                            'No notifications yet', 
+                            l10n.get('noNotifications'), 
                             style: TextStyle(color: Colors.grey.shade500, fontSize: 16),
                           ),
                         ],

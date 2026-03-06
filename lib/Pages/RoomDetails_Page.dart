@@ -61,15 +61,42 @@ class _RoomDetailsPageState extends State<RoomDetailsPage> {
     final l10n = AppLocalizations.of(context);
     final room = widget.room;
     final colorScheme = Theme.of(context).colorScheme;
-    final isAvailable = room.isAvailable;
-    final statusColor = isAvailable ? Colors.green : Colors.red;
-    final statusText = isAvailable ? l10n.get('available') : l10n.get('occupied');
+    
+    Color statusColor;
+    String statusText;
+
+    switch (room.status) {
+      case 'available':
+        statusColor = Colors.green;
+        statusText = l10n.get('available');
+        break;
+      case 'maintenance':
+        statusColor = Colors.orange;
+        statusText = l10n.get('maintenance');
+        break;
+      case 'reserved':
+        statusColor = Colors.blue;
+        statusText = l10n.get('reserved');
+        break;
+      case 'occupied':
+      default:
+        statusColor = Colors.red;
+        statusText = l10n.get('occupied');
+        break;
+    }
+
+    final isAvailable = room.status == 'available';
 
     final avail = room.availability;
     final startTime = avail['startTime'] as String? ?? 'N/A';
     final endTime = avail['endTime'] as String? ?? 'N/A';
     final daysList = (avail['daysOfWeek'] as List<dynamic>?)?.cast<int>() ?? [];
-    final daysString = daysList.map((d) => _getDayName(d, context)).join(' • ');
+    String daysString = daysList.map((d) => _getDayName(d, context)).join(' • ');
+    
+    // If all 7 days are selected, show a range instead of a list
+    if (daysList.length == 7) {
+      daysString = "${_getDayName(1, context)} - ${_getDayName(7, context)}";
+    }
 
     final rules = room.bookingRules;
     final minDuration = rules['minDurationMinutes'] ?? 0;
@@ -83,7 +110,7 @@ class _RoomDetailsPageState extends State<RoomDetailsPage> {
         : room.description;
 
     final locale = Localizations.localeOf(context).toString();
-    final formattedDate = DateFormat('EEEE, MMM d • hh:mm a', locale).format(_now);
+    final formattedDate = DateFormat('EEE, MMM d • hh:mm a', locale).format(_now);
 
     String getLocalizedFeature(String feature) {
       return l10n.getFeature(feature);
@@ -284,7 +311,13 @@ class _RoomDetailsPageState extends State<RoomDetailsPage> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(
-                                isAvailable ? Icons.check_circle_rounded : Icons.remove_circle_rounded,
+                                room.status == 'available'
+                                    ? Icons.check_circle_rounded
+                                    : room.status == 'maintenance'
+                                        ? Icons.build_rounded
+                                        : room.status == 'reserved'
+                                            ? Icons.bookmark_rounded
+                                            : Icons.remove_circle_rounded,
                                 size: 16,
                                 color: statusColor,
                               ),

@@ -402,20 +402,32 @@ class _ReservePageState extends State<ReservePage> {
     final colorScheme = Theme.of(context).colorScheme;
     final locale = Localizations.localeOf(context).toString();
 
+    final int minDuration = (widget.room.bookingRules['minDurationMinutes'] as int?) ?? 30;
     final int maxDuration = (widget.room.bookingRules['maxDurationMinutes'] as int?) ?? 1440;
-    final List<int> durationOptions = [15, 30, 45, 60, 90, 120, 180, 240, 480]
-        .where((d) => d <= maxDuration)
+
+    // Build duration options starting at min and ending at max
+    final List<int> standardIntervals = [15, 30, 45, 60, 90, 120, 180, 240, 480, 720, 1440];
+    final List<int> durationOptions = standardIntervals
+        .where((d) => d > minDuration && d < maxDuration)
         .toList();
 
+    // Add boundaries
+    if (!durationOptions.contains(minDuration)) durationOptions.add(minDuration);
+    if (!durationOptions.contains(maxDuration) && maxDuration >= minDuration) {
+      durationOptions.add(maxDuration);
+    }
+    durationOptions.sort();
+
+    // Ensure current selection is valid
     if (!durationOptions.contains(_durationMinutes)) {
-      if (_durationMinutes <= maxDuration) {
+      if (_durationMinutes < minDuration) {
+        _durationMinutes = minDuration;
+      } else if (_durationMinutes > maxDuration) {
+        _durationMinutes = maxDuration;
+      } else {
+        // If it's in between but not in list, add it to avoid dropdown error
         durationOptions.add(_durationMinutes);
         durationOptions.sort();
-      } else {
-        _durationMinutes = durationOptions.isNotEmpty ? durationOptions.last : maxDuration;
-        if (!durationOptions.contains(_durationMinutes)) {
-          durationOptions.add(_durationMinutes);
-        }
       }
     }
 
@@ -803,8 +815,7 @@ class _ReservePageState extends State<ReservePage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          DateFormat('EEEE, MMM d', locale).format(start),
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                                            DateFormat('EEEE, MMM d', locale).format(start),                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                         ),
                         const SizedBox(height: 2),
                         Text(

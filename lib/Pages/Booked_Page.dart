@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import '../l10n/app_localizations.dart';
 import 'BookedDetails_Page.dart';
+import 'Notifications_Page.dart';
 import 'dart:async';
 import 'components/NoOrganization_Widget.dart';
 
@@ -97,6 +98,39 @@ class _BookedPageState extends State<BookedPage>
             backgroundColor: Colors.white,
             elevation: 0,
             foregroundColor: Colors.black,
+            actions: [
+              StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(user.uid)
+                    .collection('notifications')
+                    .where('read', isEqualTo: false)
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  int unreadCount = snapshot.data?.docs.length ?? 0;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: Badge(
+                      isLabelVisible: unreadCount > 0,
+                      label: Text(unreadCount > 9 ? '9+' : '$unreadCount'),
+                      backgroundColor: Colors.red,
+                      offset: const Offset(-4, 4),
+                      child: IconButton(
+                        icon: const Icon(Icons.notifications_outlined, size: 24),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const NotificationsPage(),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
             bottom: TabBar(
               controller: _tabController,
               isScrollable: true,

@@ -293,7 +293,7 @@ class _RoomsPageState extends State<RoomsPage> {
               final newFloors = allRooms.map((r) => r.floor).toSet().toList()
                 ..sort((a, b) => _getFloorPriority(a).compareTo(_getFloorPriority(b)));
               final newAvailabilities = allRooms
-                  .map((r) => r.isAvailable ? l10n.get('available') : l10n.get('occupied'))
+                  .map((r) => _getLocalizedStatus(r.status, l10n))
                   .toSet()
                   .toList()
                 ..sort();
@@ -399,6 +399,20 @@ class _RoomsPageState extends State<RoomsPage> {
     });
   }
 
+  String _getLocalizedStatus(String status, AppLocalizations l10n) {
+    switch (status) {
+      case 'available':
+        return l10n.get('available');
+      case 'maintenance':
+        return l10n.get('maintenance');
+      case 'reserved':
+        return l10n.get('reserved');
+      case 'occupied':
+      default:
+        return l10n.get('occupied');
+    }
+  }
+
   int _getFloorPriority(String floor) {
     final f = floor.toLowerCase();
     if (f.contains('basement')) return -1;
@@ -432,8 +446,9 @@ class _RoomsPageState extends State<RoomsPage> {
       }
 
       if (_selectedAvailability != null) {
-        final needsAvailable = _selectedAvailability == l10n.get('available');
-        if (room.isAvailable != needsAvailable) return false;
+        if (_getLocalizedStatus(room.status, l10n) != _selectedAvailability) {
+          return false;
+        }
       }
 
       if (_selectedType != null && room.type != _selectedType) return false;
@@ -751,8 +766,29 @@ class _RoomRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final borderColor = Colors.grey.shade400;
     final l10n = AppLocalizations.of(context);
-    final availabilityColor = room.isAvailable ? Colors.green : Colors.red;
-    final availabilityLabel = room.isAvailable ? l10n.get('available') : l10n.get('occupied');
+    
+    Color availabilityColor;
+    String availabilityLabel;
+
+    switch (room.status) {
+      case 'available':
+        availabilityColor = Colors.green;
+        availabilityLabel = l10n.get('available');
+        break;
+      case 'maintenance':
+        availabilityColor = Colors.orange;
+        availabilityLabel = l10n.get('maintenance');
+        break;
+      case 'reserved':
+        availabilityColor = Colors.blue;
+        availabilityLabel = l10n.get('reserved');
+        break;
+      case 'occupied':
+      default:
+        availabilityColor = Colors.red;
+        availabilityLabel = l10n.get('occupied');
+        break;
+    }
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -912,6 +948,7 @@ class Room {
   final String building;
   final String floor;
   final bool isAvailable;
+  final String status;
   final List<RoomTag> tags;
   final String? photoURL;
   final String description;
@@ -926,6 +963,7 @@ class Room {
     required this.building,
     required this.floor,
     required this.isAvailable,
+    required this.status,
     required this.tags,
     this.photoURL,
     required this.description,
@@ -966,6 +1004,7 @@ class Room {
       building: building,
       floor: floor,
       isAvailable: isAvailable,
+      status: status,
       tags: parsedTags,
       photoURL: data['photoURL'],
       description: data['description'] ?? '',
