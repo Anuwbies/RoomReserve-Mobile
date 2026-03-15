@@ -480,6 +480,7 @@ class _ProfilePageState extends State<ProfilePage> {
                               if (existingQuery.docs.isNotEmpty) {
                                 // Update existing
                                 await existingQuery.docs.first.reference.update({
+                                  'joinedAt': FieldValue.serverTimestamp(),
                                   'status': 'pending',
                                   'updatedAt': FieldValue.serverTimestamp(),
                                   'name': userName,
