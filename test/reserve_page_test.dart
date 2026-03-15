@@ -69,22 +69,19 @@ void main() {
     
     // Check for updated labels
     expect(find.text('Duration'), findsOneWidget);
-    expect(find.text('30mins'), findsOneWidget); // Default value formatted
+    expect(find.text('30 mins'), findsOneWidget); // Default value formatted
     
     // Check that helper text is NOT present (as requested to be removed)
     expect(find.text('Booking allowed up to 30 days in advance'), findsNothing);
     
     // Verify max duration filtering (max is 120 in test room)
-    await tester.tap(find.text('30mins'));
-    await tester.pumpAndSettle();
+    // 120 should be present (2 Hours)
+    expect(find.text('2 Hours'), findsOneWidget);
+    // 180 should NOT be present (3 Hours)
+    expect(find.text('3 Hours'), findsNothing);
     
-    // 120 should be present (2hrs)
-    expect(find.text('2hrs'), findsOneWidget);
-    // 180 should NOT be present (3hrs)
-    expect(find.text('3hrs'), findsNothing);
-    
-    // Close dropdown
-    await tester.tap(find.text('2hrs')); // Select 2hrs
+    // Select 2 Hours
+    await tester.tap(find.text('2 Hours'));
     await tester.pumpAndSettle();
     
     expect(find.text('Confirm Reservation'), findsOneWidget);
@@ -101,7 +98,7 @@ void main() {
     await tester.pump(const Duration(seconds: 3)); // Finish animation (SnackBar)
 
     // 6. Verify SnackBar
-    expect(find.text('Reservation Confirmed (Logged to Console)'), findsOneWidget);
+    expect(find.text('Reservation Confirmed'), findsOneWidget);
   });
 
   testWidgets('ReservePage handles approval required', (WidgetTester tester) async {
@@ -172,6 +169,6 @@ void main() {
     await tester.pump(const Duration(seconds: 3));
 
     // 5. Verify SnackBar (execution successful)
-    expect(find.text('Reservation Confirmed (Logged to Console)'), findsOneWidget);
+    expect(find.text('Reservation Confirmed'), findsOneWidget);
   });
 }

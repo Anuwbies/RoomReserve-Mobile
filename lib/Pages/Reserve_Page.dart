@@ -432,7 +432,7 @@ class _ReservePageState extends State<ReservePage> {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F6FA),
+      backgroundColor: const Color(0xFFF8F9FD),
       body: SafeArea(
         child: Column(
           children: [
@@ -465,33 +465,35 @@ class _ReservePageState extends State<ReservePage> {
             ),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20.0),
+                physics: const ClampingScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                 child: Form(
                   key: _formKey,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Room Info Card
                       Container(
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(20),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.04),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
+                              color: colorScheme.primary.withValues(alpha: 0.05),
+                              blurRadius: 15,
+                              offset: const Offset(0, 8),
                             ),
                           ],
                         ),
                         child: Row(
                           children: [
                             Container(
-                              height: 64,
-                              width: 64,
+                              height: 80,
+                              width: 80,
                               decoration: BoxDecoration(
-                                color: colorScheme.primary.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(12),
+                                color: colorScheme.primary.withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(16),
                                 image: widget.room.photoURL != null && widget.room.photoURL!.isNotEmpty
                                     ? DecorationImage(
                                         image: NetworkImage(widget.room.photoURL!),
@@ -500,7 +502,7 @@ class _ReservePageState extends State<ReservePage> {
                                     : null,
                               ),
                               child: widget.room.photoURL == null || widget.room.photoURL!.isEmpty
-                                  ? Icon(Icons.meeting_room_rounded, color: colorScheme.primary, size: 30)
+                                  ? Icon(Icons.meeting_room_rounded, color: colorScheme.primary, size: 32)
                                   : null,
                             ),
                             const SizedBox(width: 16),
@@ -511,17 +513,40 @@ class _ReservePageState extends State<ReservePage> {
                                   Text(
                                     widget.room.name,
                                     style: const TextStyle(
-                                      fontSize: 18,
+                                      fontSize: 19,
                                       fontWeight: FontWeight.bold,
+                                      letterSpacing: -0.5,
                                     ),
                                   ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    '${widget.room.building} • ${_getLocalizedFloor(widget.room.floor, l10n)}',
-                                    style: TextStyle(
-                                      color: Colors.grey.shade600,
-                                      fontSize: 14,
-                                    ),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      Icon(Icons.location_on_rounded, size: 14, color: colorScheme.primary.withValues(alpha: 0.7)),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        '${widget.room.building} • ${_getLocalizedFloor(widget.room.floor, l10n)}',
+                                        style: TextStyle(
+                                          color: Colors.grey.shade600,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      Icon(Icons.people_alt_rounded, size: 14, color: Colors.grey.shade500),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        '${l10n.get('capacity')}: ${widget.room.capacity}',
+                                        style: TextStyle(
+                                          color: Colors.grey.shade600,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
@@ -529,87 +554,103 @@ class _ReservePageState extends State<ReservePage> {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 24),
-                      _SectionHeader(title: l10n.get('date')),
-                      const SizedBox(height: 5),
+                      const SizedBox(height: 30),
+                      
+                      // Date Selection
+                      _SectionHeader(title: l10n.get('date'), icon: Icons.calendar_today_rounded),
+                      const SizedBox(height: 10),
                       _SelectionTile(
                         label: l10n.get('selectDate'),
                         value: DateFormat('EEEE, MMM d, yyyy', locale).format(_selectedDate),
-                        icon: Icons.calendar_today_rounded,
                         onTap: () => _selectDate(context),
                       ),
-                      const SizedBox(height: 16),
-                      _SectionHeader(title: l10n.get('startTime')),
-                      const SizedBox(height: 5),
+                      
+                      const SizedBox(height: 24),
+                      
+                      // Time Selection
+                      _SectionHeader(title: l10n.get('startTime'), icon: Icons.access_time_rounded),
+                      const SizedBox(height: 10),
                       _SelectionTile(
                         label: l10n.get('selectTime'),
                         value: DateFormat('h:mm a', locale).format(DateTime(2024, 1, 1, _startTime.hour, _startTime.minute)),
-                        icon: Icons.access_time_rounded,
                         onTap: () => _selectTime(context),
                         errorText: _timeErrorMessage,
                       ),
-                      const SizedBox(height: 16),
-                      _SectionHeader(title: l10n.get('duration')),
-                      const SizedBox(height: 5),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.grey.shade200),
-                        ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButtonFormField<int>(
-                            value: _durationMinutes,
-                            decoration: const InputDecoration(
-                              border: InputBorder.none,
-                              icon: Icon(Icons.timelapse_rounded, color: Colors.blueGrey),
+                      
+                      const SizedBox(height: 24),
+                      
+                      // Duration Selection
+                      _SectionHeader(title: l10n.get('duration'), icon: Icons.timelapse_rounded),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: durationOptions.map((int value) {
+                          final isSelected = _durationMinutes == value;
+                          return ChoiceChip(
+                            label: Text(_formatDuration(value, l10n)),
+                            selected: isSelected,
+                            onSelected: (bool selected) {
+                              if (selected) {
+                                setState(() {
+                                  _durationMinutes = value;
+                                });
+                                _checkAvailability();
+                              }
+                            },
+                            backgroundColor: Colors.white,
+                            selectedColor: colorScheme.primary.withValues(alpha: 0.15),
+                            checkmarkColor: colorScheme.primary,
+                            labelStyle: TextStyle(
+                              color: isSelected ? colorScheme.primary : Colors.grey.shade700,
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                              fontSize: 13,
                             ),
-                            items: durationOptions.map((int value) {
-                              return DropdownMenuItem<int>(
-                                value: value,
-                                child: Text(_formatDuration(value, l10n)),
-                              );
-                            }).toList(),
-                            onChanged: (int? newValue) {
-                              setState(() {
-                                _durationMinutes = newValue!;
-                              });
-                              _checkAvailability();
-                            },
-                            validator: (value) {
-                              final min = widget.room.bookingRules['minDurationMinutes'] as int? ?? 0;
-                              final max = widget.room.bookingRules['maxDurationMinutes'] as int? ?? 1440;
-                              if (value! < min && min > 0) return 'Min: ${_formatDuration(min, l10n)}';
-                              if (value > max && max > 0) return 'Max: ${_formatDuration(max, l10n)}';
-                              return null;
-                            },
-                          ),
-                        ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: BorderSide(
+                                color: isSelected ? colorScheme.primary : Colors.grey.shade200,
+                                width: 1,
+                              ),
+                            ),
+                            elevation: isSelected ? 2 : 0,
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                          );
+                        }).toList(),
                       ),
-                      const SizedBox(height: 16),
-                      _SectionHeader(title: l10n.get('purpose')),
-                      const SizedBox(height: 5),
+                      
+                      const SizedBox(height: 24),
+                      
+                      // Purpose Input
+                      _SectionHeader(title: l10n.get('purpose'), icon: Icons.description_rounded),
+                      const SizedBox(height: 10),
                       TextFormField(
                         controller: _purposeController,
                         maxLines: 3,
                         maxLength: 50,
+                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
                         decoration: InputDecoration(
                           hintText: l10n.get('meetingWorkshop'),
+                          hintStyle: TextStyle(color: Colors.grey.shade400, fontWeight: FontWeight.normal),
                           filled: true,
                           fillColor: Colors.white,
-                          contentPadding: const EdgeInsets.all(16),
+                          contentPadding: const EdgeInsets.all(18),
+                          counterStyle: TextStyle(color: Colors.grey.shade500, fontSize: 11),
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(18),
                             borderSide: BorderSide(color: Colors.grey.shade200),
                           ),
                           enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(18),
                             borderSide: BorderSide(color: Colors.grey.shade200),
                           ),
                           focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(18),
                             borderSide: BorderSide(color: colorScheme.primary, width: 2),
+                          ),
+                          errorBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(18),
+                            borderSide: BorderSide(color: Colors.red.shade200),
                           ),
                         ),
                         validator: (value) {
@@ -619,12 +660,13 @@ class _ReservePageState extends State<ReservePage> {
                           return null;
                         },
                       ),
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 40),
                     ],
                   ),
                 ),
               ),
             ),
+            // Bottom Action Button
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
               decoration: BoxDecoration(
@@ -644,7 +686,7 @@ class _ReservePageState extends State<ReservePage> {
                     backgroundColor: colorScheme.primary,
                     foregroundColor: Colors.white,
                     disabledBackgroundColor: colorScheme.primary.withValues(alpha: 0.6),
-                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
                     minimumSize: const Size(double.infinity, 56),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
@@ -778,6 +820,7 @@ class _ReservePageState extends State<ReservePage> {
 
         return ListView.builder(
           controller: scrollController,
+          physics: const ClampingScrollPhysics(),
           itemCount: validBookings.length,
           itemBuilder: (context, index) {
             final data = validBookings[index].data() as Map<String, dynamic>;
@@ -815,7 +858,8 @@ class _ReservePageState extends State<ReservePage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                                                            DateFormat('EEEE, MMM d', locale).format(start),                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                          DateFormat('EEEE, MMM d', locale).format(start),
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                         ),
                         const SizedBox(height: 2),
                         Text(
@@ -837,18 +881,25 @@ class _ReservePageState extends State<ReservePage> {
 
 class _SectionHeader extends StatelessWidget {
   final String title;
-  const _SectionHeader({required this.title});
+  final IconData icon;
+  const _SectionHeader({required this.title, required this.icon});
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      title.toUpperCase(),
-      style: TextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.bold,
-        color: Colors.grey.shade500,
-        letterSpacing: 1.2,
-      ),
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.7)),
+        const SizedBox(width: 8),
+        Text(
+          title.toUpperCase(),
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+            color: Colors.grey.shade500,
+            letterSpacing: 1.5,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -856,60 +907,82 @@ class _SectionHeader extends StatelessWidget {
 class _SelectionTile extends StatelessWidget {
   final String label;
   final String value;
-  final IconData icon;
   final VoidCallback onTap;
   final String? errorText;
 
   const _SelectionTile({
     required this.label,
     required this.value,
-    required this.icon,
     required this.onTap,
     this.errorText,
   });
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: errorText != null ? Colors.red.shade200 : Colors.grey.shade200,
-                width: errorText != null ? 1.5 : 1,
+        Material(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(18),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: errorText != null ? Colors.red.shade200 : Colors.grey.shade200,
+                  width: errorText != null ? 1.5 : 1,
+                ),
               ),
-            ),
-            child: Row(
-              children: [
-                Icon(icon, color: Colors.blueGrey, size: 22),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Text(
-                    value,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          value,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ),
-                Icon(Icons.chevron_right_rounded, color: Colors.grey.shade400),
-              ],
+                  Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primary.withValues(alpha: 0.05),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.chevron_right_rounded, color: colorScheme.primary, size: 20),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
         if (errorText != null)
           Padding(
             padding: const EdgeInsets.only(top: 8, left: 4),
-            child: Text(
-              errorText!,
-              style: TextStyle(color: Colors.red.shade700, fontSize: 12),
+            child: Row(
+              children: [
+                Icon(Icons.error_outline_rounded, size: 14, color: Colors.red.shade700),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    errorText!,
+                    style: TextStyle(color: Colors.red.shade700, fontSize: 12, fontWeight: FontWeight.w500),
+                  ),
+                ),
+              ],
             ),
           ),
       ],

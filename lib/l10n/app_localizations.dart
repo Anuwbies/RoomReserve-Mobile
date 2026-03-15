@@ -113,7 +113,7 @@ class AppLocalizations {
       'existingReservations': 'Existing Reservations',
       'noUpcomingReservations': 'No upcoming reservations found.',
       'lastUpdated': 'Last updated: January 2026',
-      'timeInPast': 'Selected time is in the past',
+      'timeInPast': "You can't book a time that has already passed",
       'timeOverlap': 'Selected time overlaps with an existing booking',
       // Notifications
       'notificationSettings': 'Notification Settings',
@@ -444,7 +444,7 @@ class AppLocalizations {
       'existingReservations': '現在の予約状況',
       'noUpcomingReservations': '今後の予約はありません',
       'lastUpdated': '最終更新日：2026年1月',
-      'timeInPast': '過去の時間は選択できません',
+      'timeInPast': 'すでに過ぎた時間は予約できません',
       'timeOverlap': '他の予約と重なっています',
       // Notifications
       'notificationSettings': '通知設定',
@@ -775,7 +775,7 @@ class AppLocalizations {
       'existingReservations': '현재 예약 현황',
       'noUpcomingReservations': '예정된 예약이 없습니다',
       'lastUpdated': '최종 업데이트: 2026년 1월',
-      'timeInPast': '과거 시간은 선택할 수 없습니다',
+      'timeInPast': '지나간 시간은 예약할 수 없어요',
       'timeOverlap': '다른 예약 시간과 겹칩니다',
       // Notifications
       'notificationSettings': '알림 설정',
@@ -1103,7 +1103,7 @@ class AppLocalizations {
       'existingReservations': 'Mga Kasalukuyang Reservasyon',
       'noUpcomingReservations': 'Walang nahanap na darating na reservasyon.',
       'lastUpdated': 'Huling na-update: Enero 2026',
-      'timeInPast': 'Ang napiling oras ay nakalipas na',
+      'timeInPast': 'Hindi ka pwedeng mag-book sa oras na nakalipas na',
       'timeOverlap': 'Ang napiling oras ay tumatama sa ibang reservasyon',
       // Notifications
       'notificationSettings': 'Mga Setting ng Notipikasyon',
