@@ -56,6 +56,15 @@ class _RoomDetailsPageState extends State<RoomDetailsPage> {
     return DateFormat('EEE', locale).format(date);
   }
 
+  List<int> _getOrderedDays(List<dynamic>? rawDays) {
+    return (rawDays?.cast<int>() ?? [])
+        .map((day) => day == 0 ? DateTime.sunday : day)
+        .where((day) => day >= DateTime.monday && day <= DateTime.sunday)
+        .toSet()
+        .toList()
+      ..sort();
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -90,12 +99,13 @@ class _RoomDetailsPageState extends State<RoomDetailsPage> {
     final avail = room.availability;
     final startTime = avail['startTime'] as String? ?? 'N/A';
     final endTime = avail['endTime'] as String? ?? 'N/A';
-    final daysList = (avail['daysOfWeek'] as List<dynamic>?)?.cast<int>() ?? [];
+    final daysList = _getOrderedDays(avail['daysOfWeek'] as List<dynamic>?);
     String daysString = daysList.map((d) => _getDayName(d, context)).join(' • ');
     
     // If all 7 days are selected, show a range instead of a list
     if (daysList.length == 7) {
-      daysString = "${_getDayName(1, context)} - ${_getDayName(7, context)}";
+      daysString =
+          "${_getDayName(DateTime.monday, context)} - ${_getDayName(DateTime.sunday, context)}";
     }
 
     final rules = room.bookingRules;

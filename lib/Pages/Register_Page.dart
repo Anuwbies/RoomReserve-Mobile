@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 import 'Login_Page.dart';
@@ -27,16 +28,19 @@ class _RegisterPageState extends State<RegisterPage> {
 
   final GoogleSignIn _googleSignIn = GoogleSignIn();
 
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
   RegisterMethod _loadingMethod = RegisterMethod.none;
   bool get _isLoading => _loadingMethod != RegisterMethod.none;
 
-  InputDecoration _inputDecoration(String hint) {
+  InputDecoration _inputDecoration(String hint, {Widget? suffixIcon}) {
     return InputDecoration(
       hintText: hint,
       hintStyle: const TextStyle(color: Colors.grey),
       filled: true,
       fillColor: const Color(0xFFF9FAFB),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      suffixIcon: suffixIcon,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
         borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
@@ -50,6 +54,63 @@ class _RegisterPageState extends State<RegisterPage> {
         borderSide: const BorderSide(color: Colors.blue),
       ),
     );
+  }
+
+  bool _isValidEmail(String email) {
+    return RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email);
+  }
+
+  String? _getNameValidationMessage({
+    required AppLocalizations l10n,
+    required String value,
+    required String minLengthKey,
+    required String maxLengthKey,
+    required String invalidCharactersKey,
+  }) {
+    if (value.length < 3) {
+      return l10n.get(minLengthKey);
+    }
+
+    if (value.length > 16) {
+      return l10n.get(maxLengthKey);
+    }
+
+    final validNamePattern = RegExp(
+      r'^[A-Za-z\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uAC00-\uD7AF]+$',
+    );
+
+    if (!validNamePattern.hasMatch(value)) {
+      return l10n.get(invalidCharactersKey);
+    }
+
+    return null;
+  }
+
+  String? _getPasswordValidationMessage(
+    AppLocalizations l10n,
+    String password,
+  ) {
+    if (password.length < 8) {
+      return l10n.get('passwordMinLength');
+    }
+
+    if (!password.contains(RegExp(r'[A-Z]'))) {
+      return l10n.get('passwordNeedsUppercase');
+    }
+
+    if (!password.contains(RegExp(r'\d'))) {
+      return l10n.get('passwordNeedsNumber');
+    }
+
+    if (!password.contains(RegExp(r'[^A-Za-z0-9\s]'))) {
+      return l10n.get('passwordNeedsSpecialCharacter');
+    }
+
+    if (password.contains(RegExp(r'\s'))) {
+      return l10n.get('passwordNoSpaces');
+    }
+
+    return null;
   }
 
   // ---------------- FIRESTORE SAVE LOGIC ----------------
@@ -90,8 +151,48 @@ class _RegisterPageState extends State<RegisterPage> {
     final password = _passwordController.text;
     final confirmPassword = _confirmPasswordController.text;
 
-    if ([firstName, lastName, email, password].any((value) => value.isEmpty)) {
+    if ([firstName, lastName, email, password, confirmPassword]
+        .any((value) => value.isEmpty)) {
       _showError(l10n.get('allFieldsRequired'));
+      return;
+    }
+
+    final firstNameValidationMessage = _getNameValidationMessage(
+      l10n: l10n,
+      value: firstName,
+      minLengthKey: 'firstNameMinLength',
+      maxLengthKey: 'firstNameMaxLength',
+      invalidCharactersKey: 'firstNameInvalidCharacters',
+    );
+
+    if (firstNameValidationMessage != null) {
+      _showError(firstNameValidationMessage);
+      return;
+    }
+
+    final lastNameValidationMessage = _getNameValidationMessage(
+      l10n: l10n,
+      value: lastName,
+      minLengthKey: 'lastNameMinLength',
+      maxLengthKey: 'lastNameMaxLength',
+      invalidCharactersKey: 'lastNameInvalidCharacters',
+    );
+
+    if (lastNameValidationMessage != null) {
+      _showError(lastNameValidationMessage);
+      return;
+    }
+
+    if (!_isValidEmail(email)) {
+      _showError(l10n.get('invalidEmailFormat'));
+      return;
+    }
+
+    final passwordValidationMessage =
+        _getPasswordValidationMessage(l10n, password);
+
+    if (passwordValidationMessage != null) {
+      _showError(passwordValidationMessage);
       return;
     }
 
@@ -272,14 +373,73 @@ class _RegisterPageState extends State<RegisterPage> {
                       const SizedBox(height: 16),
                       TextField(
                         controller: _passwordController,
-                        decoration: _inputDecoration(l10n.get('password')),
-                        obscureText: true,
+                        obscureText: _obscurePassword,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.deny(RegExp(r'\s')),
+                        ],
+                        decoration: _inputDecoration(
+                          l10n.get('password'),
+                          suffixIcon: GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _obscurePassword = !_obscurePassword;
+                              });
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Image.asset(
+                                _obscurePassword
+                                    ? 'lib/assets/images/eye closed.png'
+                                    : 'lib/assets/images/eye open.png',
+                                width: 20,
+                                height: 20,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    Icon(
+                                      _obscurePassword
+                                          ? Icons.visibility_off
+                                          : Icons.visibility,
+                                      color: Colors.grey,
+                                    ),
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
                       const SizedBox(height: 16),
                       TextField(
                         controller: _confirmPasswordController,
-                        decoration: _inputDecoration(l10n.get('confirmPassword')),
-                        obscureText: true,
+                        obscureText: _obscureConfirmPassword,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.deny(RegExp(r'\s')),
+                        ],
+                        decoration: _inputDecoration(
+                          l10n.get('confirmPassword'),
+                          suffixIcon: GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _obscureConfirmPassword =
+                                    !_obscureConfirmPassword;
+                              });
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Image.asset(
+                                _obscureConfirmPassword
+                                    ? 'lib/assets/images/eye closed.png'
+                                    : 'lib/assets/images/eye open.png',
+                                width: 20,
+                                height: 20,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    Icon(
+                                      _obscureConfirmPassword
+                                          ? Icons.visibility_off
+                                          : Icons.visibility,
+                                      color: Colors.grey,
+                                    ),
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
                       const SizedBox(height: 28),
                       SizedBox(

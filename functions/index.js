@@ -514,21 +514,34 @@ exports.autoCompleteBookings = functions.pubsub
       const now = admin.firestore.Timestamp.now();
       const bookingsRef = admin.firestore().collection("bookings");
 
+      // Query only by endTime to avoid requiring a composite index on
+      // status + endTime for the scheduled completion job.
       const snapshot = await bookingsRef
-          .where("status", "==", "approved")
           .where("endTime", "<=", now)
           .get();
 
       if (snapshot.empty) return null;
 
-      const batch = admin.firestore().batch();
-      snapshot.docs.forEach((doc) => {
-        batch.update(doc.ref, {
-          status: "completed",
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
+      const approvedDocs = snapshot.docs.filter((doc) => {
+        const data = doc.data();
+        return (data.status || "").toLowerCase() === "approved";
       });
 
-      await batch.commit();
+      if (approvedDocs.length === 0) return null;
+
+      for (let i = 0; i < approvedDocs.length; i += 500) {
+        const batch = admin.firestore().batch();
+        approvedDocs.slice(i, i + 500).forEach((doc) => {
+          batch.update(doc.ref, {
+            status: "completed",
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        });
+        await batch.commit();
+      }
+
+      console.log(
+          `autoCompleteBookings: completed ${approvedDocs.length} bookings.`,
+      );
       return null;
     });

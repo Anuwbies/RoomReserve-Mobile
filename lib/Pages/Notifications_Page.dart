@@ -65,84 +65,6 @@ class _NotificationsPageState extends State<NotificationsPage> {
     }
   }
 
-  /// TEST: Injects all possible notification types into Firestore for UI testing
-  Future<void> _addSampleNotifications() async {
-    if (user == null) return;
-    final l10n = AppLocalizations.of(context);
-    final collection = FirebaseFirestore.instance
-        .collection('users')
-        .doc(user!.uid)
-        .collection('notifications');
-
-    final samples = [
-      {
-        'titleKey': 'notif_org_approved_title',
-        'bodyKey': 'notif_org_approved_body',
-        'type': 'organization',
-      },
-      {
-        'titleKey': 'notif_org_declined_title',
-        'bodyKey': 'notif_org_declined_body',
-        'type': 'organization',
-      },
-      {
-        'titleKey': 'notif_org_removed_title',
-        'bodyKey': 'notif_org_removed_body',
-        'type': 'organization',
-      },
-      {
-        'titleKey': 'notif_booking_approved_title',
-        'bodyKey': 'notif_booking_approved_body',
-        'type': 'booking',
-      },
-      {
-        'titleKey': 'notif_booking_declined_title',
-        'bodyKey': 'notif_booking_declined_body',
-        'type': 'booking',
-      },
-      {
-        'titleKey': 'notif_booking_cancelled_title',
-        'bodyKey': 'notif_booking_cancelled_body',
-        'type': 'booking',
-      },
-      {
-        'titleKey': 'notif_booking_completed_title',
-        'bodyKey': 'notif_booking_completed_body',
-        'type': 'booking',
-      },
-      {
-        'titleKey': 'notif_upcoming_title',
-        'bodyKey': 'notif_upcoming_body',
-        'type': 'booking',
-      },
-      {
-        'titleKey': 'notif_room_added_title',
-        'bodyKey': 'notif_room_added_body',
-        'type': 'room_added',
-      },
-    ];
-
-    for (var sample in samples) {
-      await collection.add({
-        ...sample,
-        'read': false,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-    }
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(l10n.get('sampleNotifAdded'), textAlign: TextAlign.center),
-          backgroundColor: Colors.green,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          margin: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
-        ),
-      );
-    }
-  }
-
   void _showSettingsSheet() {
     final l10n = AppLocalizations.of(context);
     showModalBottomSheet(
@@ -333,12 +255,6 @@ class _NotificationsPageState extends State<NotificationsPage> {
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                  ),
-                  // Button to add samples
-                  IconButton(
-                    icon: const Icon(Icons.playlist_add_rounded, color: Colors.blue),
-                    onPressed: _addSampleNotifications,
-                    tooltip: 'Add Samples',
                   ),
                   IconButton(
                     icon: const Icon(Icons.settings_outlined),

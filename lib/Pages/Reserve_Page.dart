@@ -15,6 +15,7 @@ class ReservePage extends StatefulWidget {
 }
 
 class _ReservePageState extends State<ReservePage> {
+  static const Duration _minimumReservationLeadTime = Duration(hours: 3);
   final _formKey = GlobalKey<FormState>();
   late DateTime _selectedDate;
   late TimeOfDay _startTime;
@@ -33,8 +34,7 @@ class _ReservePageState extends State<ReservePage> {
         .snapshots();
 
     // 1. Initialize Date: Find first valid date
-    final List<int> allowedDays = (widget.room
-        .availability['daysOfWeek'] as List<dynamic>?)?.cast<int>() ?? [];
+    final allowedDays = _getNormalizedAllowedDays();
     _selectedDate = _getInitialDate(allowedDays);
 
     // 2. Initialize Time: Check against min/max
@@ -87,6 +87,13 @@ class _ReservePageState extends State<ReservePage> {
 
     // Prevent past reservations
     final now = DateTime.now();
+    final currentMinute = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      now.hour,
+      now.minute,
+    );
     final selectedDateTime = DateTime(
       _selectedDate.year,
       _selectedDate.month,
@@ -95,8 +102,12 @@ class _ReservePageState extends State<ReservePage> {
       time.minute,
     );
     
-    if (selectedDateTime.isBefore(now.subtract(const Duration(minutes: 1)))) {
+    if (selectedDateTime.isBefore(currentMinute.subtract(const Duration(minutes: 1)))) {
       return l10n.get('timeInPast');
+    }
+
+    if (selectedDateTime.isBefore(currentMinute.add(_minimumReservationLeadTime))) {
+      return l10n.get('minimumAdvanceTime');
     }
     
     return null;
@@ -193,6 +204,19 @@ class _ReservePageState extends State<ReservePage> {
     return null;
   }
 
+  List<int> _getNormalizedAllowedDays() {
+    final rawDays = (widget.room.availability['daysOfWeek'] as List<dynamic>?)
+            ?.cast<int>() ??
+        [];
+
+    return rawDays
+        .map((day) => day == 0 ? DateTime.sunday : day)
+        .where((day) => day >= DateTime.monday && day <= DateTime.sunday)
+        .toSet()
+        .toList()
+      ..sort();
+  }
+
   DateTime _getInitialDate(List<int> allowedDays) {
     DateTime date = DateTime.now();
     if (allowedDays.isEmpty) return date;
@@ -208,8 +232,7 @@ class _ReservePageState extends State<ReservePage> {
     final int advanceDays = (widget.room
         .bookingRules['advanceBookingDays'] as int?) ?? 365;
     final DateTime lastDate = DateTime.now().add(Duration(days: advanceDays));
-    final List<int> allowedDays = (widget.room
-        .availability['daysOfWeek'] as List<dynamic>?)?.cast<int>() ?? [];
+    final allowedDays = _getNormalizedAllowedDays();
 
     DateTime initialDate = _selectedDate;
     if (allowedDays.isNotEmpty && !allowedDays.contains(initialDate.weekday)) {
@@ -256,7 +279,25 @@ class _ReservePageState extends State<ReservePage> {
 
   Future<void> _submitReservation() async {
     final l10n = AppLocalizations.of(context);
-    
+
+    final currentTimeError =
+        _getTimeError(_startTime, durationMinutes: _durationMinutes);
+
+    if (currentTimeError != null) {
+      setState(() {
+        _timeErrorMessage = currentTimeError;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(currentTimeError, textAlign: TextAlign.center),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          margin: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+        ),
+      );
+      return;
+    }
+
     // Final UI check
     if (_timeErrorMessage != null) {
       ScaffoldMessenger.of(context).showSnackBar(
